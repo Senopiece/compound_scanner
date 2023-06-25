@@ -2,11 +2,12 @@ import 'dart:math';
 
 import 'package:compound_scanner/screens/scan_result.dart';
 import 'package:compound_scanner/screens/static_image.dart';
+import 'package:compound_scanner/utils/conversions.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 
 import '../resizable_box.dart';
-import '../utils/crop_image.dart';
+import 'package:image/image.dart' as imglib;
 
 class CameraPictureScreen extends StatefulWidget {
   const CameraPictureScreen({
@@ -20,6 +21,7 @@ class CameraPictureScreen extends StatefulWidget {
 class _CameraPictureScreenState extends State<CameraPictureScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
+  CameraImage? _latestFrame;
 
   final GlobalKey<ResizableBoxState> _resizableBoxKey =
       GlobalKey<ResizableBoxState>();
@@ -45,11 +47,13 @@ class _CameraPictureScreenState extends State<CameraPictureScreen> {
       ResolutionPreset.high,
       enableAudio: false,
     );
-    return await _controller.initialize();
+    await _controller.initialize();
+    await _controller.startImageStream((image) => _latestFrame = image);
   }
 
   @override
   void dispose() {
+    _controller.stopImageStream();
     _controller.dispose();
     super.dispose();
   }
@@ -137,9 +141,12 @@ class _CameraPictureScreenState extends State<CameraPictureScreen> {
                           // TODO: forbid to run concurrent shots
                           await _initializeControllerFuture;
 
-                          // attempt to take a picture
-                          final shot = await _controller.takePicture();
-                          final bytes = await shot.readAsBytes();
+                          // take the last preview frame
+                          final image = convertYUV420ToImage(
+                            _latestFrame!,
+                            rotation:
+                                _controller.value.description.sensorOrientation,
+                          );
 
                           // crop it
                           final size = MediaQuery.of(context).size;
@@ -149,21 +156,26 @@ class _CameraPictureScreenState extends State<CameraPictureScreen> {
                           final selection =
                               _resizableBoxKey.currentState!.getSize();
 
-                          final cropped = cropImage(
-                            bytes,
-                            x: 0.5 * (previewSize.width - selection.width / s),
-                            y: 0.5 *
-                                (previewSize.height - selection.height / s),
-                            width: selection.width / s,
-                            height: selection.height / s,
-                          )!;
-                          final image = Image.memory(cropped);
+                          final cropped = imglib.copyCrop(
+                            image,
+                            x: (0.5 * (previewSize.width - selection.width / s))
+                                .toInt(),
+                            y: (0.5 *
+                                    (previewSize.height - selection.height / s))
+                                .toInt(),
+                            width: selection.width ~/ s,
+                            height: selection.height ~/ s,
+                          );
+
+                          final drawn_image =
+                              Image.memory(imglib.encodePng(cropped));
 
                           // display it on a new screen.
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => ResultScreen(image: image),
+                              builder: (context) =>
+                                  ResultScreen(image: drawn_image),
                             ),
                           );
                         },

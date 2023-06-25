@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:compound_scanner/screens/scan_result.dart';
 import 'package:flutter/material.dart';
@@ -70,12 +69,7 @@ class _StaticImageScreenState extends State<StaticImageScreen> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             if (snapshot.data == null) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CameraPictureScreen(),
-                ),
-              );
+              return const Center(child: Text("< No image selected >"));
             }
 
             final size = MediaQuery.of(context).size;
@@ -106,7 +100,7 @@ class _StaticImageScreenState extends State<StaticImageScreen> {
         },
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: FutureBuilder<void>(
+      floatingActionButton: FutureBuilder<img.Image?>(
         future: _imagePicking,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
@@ -130,46 +124,50 @@ class _StaticImageScreenState extends State<StaticImageScreen> {
                       ),
                     ),
                     const SizedBox(width: 30),
-                    SizedBox(
-                      width: 80,
-                      height: 80,
-                      child: FloatingActionButton(
-                        onPressed: () async {
-                          // TODO: forbid to run concurrent shots
-                          final p = await _imagePicking;
-                          if (p == null) return;
+                    snapshot.data != null
+                        ? SizedBox(
+                            width: 80,
+                            height: 80,
+                            child: FloatingActionButton(
+                              onPressed: () async {
+                                // TODO: forbid to run concurrent shots
+                                // crop it
+                                final size = MediaQuery.of(context).size;
+                                final previewSize = _previewSize();
+                                final s = _previewScale(size, previewSize);
 
-                          // crop it
-                          final size = MediaQuery.of(context).size;
-                          final previewSize = _previewSize();
-                          final s = _previewScale(size, previewSize);
+                                final selection =
+                                    _resizableBoxKey.currentState!.getSize();
 
-                          final selection =
-                              _resizableBoxKey.currentState!.getSize();
+                                final cropped = img.copyCrop(
+                                  _pickedImage,
+                                  x: (0.5 *
+                                          (previewSize.width -
+                                              selection.width / s))
+                                      .toInt(),
+                                  y: (0.5 *
+                                          (previewSize.height -
+                                              selection.height / s))
+                                      .toInt(),
+                                  width: selection.width ~/ s,
+                                  height: selection.height ~/ s,
+                                );
+                                final image =
+                                    Image.memory(img.encodePng(cropped));
 
-                          final cropped = img.copyCrop(
-                            _pickedImage,
-                            x: (0.5 * (previewSize.width - selection.width / s))
-                                .toInt(),
-                            y: (0.5 *
-                                    (previewSize.height - selection.height / s))
-                                .toInt(),
-                            width: selection.width ~/ s,
-                            height: selection.height ~/ s,
-                          );
-                          final image = Image.memory(img.encodePng(cropped));
-
-                          // display it on a new screen.
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ResultScreen(image: image),
+                                // display it on a new screen.
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        ResultScreen(image: image),
+                                  ),
+                                );
+                              },
+                              child: const Icon(Icons.check),
                             ),
-                          );
-                        },
-                        child: const Icon(Icons.check),
-                      ),
-                    ),
+                          )
+                        : const SizedBox(width: 30),
                     const SizedBox(width: 30),
                     SizedBox(
                       width: 60,

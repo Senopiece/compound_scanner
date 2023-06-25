@@ -9,6 +9,7 @@ Uint8List? cropImage(
   required double height,
 }) {
   final image = img.decodeImage(bytes);
+  print(image);
   if (image == null) return null;
   final cropped = img.copyCrop(
     image,
