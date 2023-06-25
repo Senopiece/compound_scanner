@@ -1,8 +1,5 @@
 on:
   push:
-    # Trigger the workflow only when a tag is created on the main branch
-    tags:
-      - 'v*'
     branches:
       - main
 
@@ -42,8 +39,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: ${{ github.event.head_commit.message }}
+          release_name: Release ${{ github.event.head_commit.message }}
           body: Autorelease
           draft: false
           prerelease: false
