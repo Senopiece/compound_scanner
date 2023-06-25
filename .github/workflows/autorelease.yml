@@ -1,5 +1,5 @@
 on:
-  create:
+  push:
     # Trigger the workflow only when a tag is created on the main branch
     tags:
       - 'v*'
