@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="compound_scanner"
+        android:label="Compound Scanner"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
