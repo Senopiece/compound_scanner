@@ -17,7 +17,8 @@ class ImagePickScreen extends StatefulWidget {
   State<ImagePickScreen> createState() => _ImagePickScreenState();
 }
 
-class _ImagePickScreenState extends State<ImagePickScreen> {
+class _ImagePickScreenState extends State<ImagePickScreen>
+    with WidgetsBindingObserver {
   bool _isCameraActive = true; // may be active, but still with error
   bool _flash = false;
 
@@ -29,6 +30,34 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
 
   final GlobalKey<ResizableBoxState> _resizableBoxKey =
       GlobalKey<ResizableBoxState>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _activateCamera();
+        break;
+      case AppLifecycleState.paused:
+        break;
+      case AppLifecycleState.inactive:
+        _deactivateCamera();
+        break;
+      case AppLifecycleState.detached:
+        break;
+    }
+  }
 
   void _deactivateCamera() {
     _isCameraActive = false;
@@ -87,7 +116,6 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
               ],
             )
           : const Center(),
-      // TODO: mv to stack with camera
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
