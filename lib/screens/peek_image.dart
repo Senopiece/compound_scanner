@@ -8,6 +8,7 @@ import 'package:image/image.dart' as img;
 import '../widgets/resizable_box.dart';
 import 'camera_picture.dart';
 
+// TODO: scroll image too
 class PeekImageScreen extends StatefulWidget {
   const PeekImageScreen({
     Key? key,
@@ -43,6 +44,7 @@ class _PeekImageScreenState extends State<PeekImageScreen> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
+              maintainState: false,
               builder: (context) => const CameraPictureScreen(),
             ),
           );
@@ -93,10 +95,12 @@ class _PeekImageScreenState extends State<PeekImageScreen> {
                       minHeight: 0.0,
                       maxWidth: double.infinity,
                       maxHeight: double.infinity,
-                      child: SizedBox(
+                      child: Image.memory(
+                        img.encodePng(_pickedImage!),
+                        // yep, can be replaced by fit: cover
+                        scale: 1 / s,
                         width: s * previewSize.width,
                         height: s * previewSize.height,
-                        child: Image.memory(img.encodePng(_pickedImage!)),
                       ),
                     ),
                     Center(
@@ -169,6 +173,7 @@ class _PeekImageScreenState extends State<PeekImageScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
+                              maintainState: false,
                               builder: (context) => ResultScreen(
                                 imageBytes: img.encodePng(cropped),
                               ),
@@ -188,6 +193,7 @@ class _PeekImageScreenState extends State<PeekImageScreen> {
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
+                              maintainState: false,
                               builder: (context) => const CameraPictureScreen(),
                             ),
                           );
