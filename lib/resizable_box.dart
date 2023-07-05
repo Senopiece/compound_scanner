@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-// TODO: fix negative box
 class ResizableBox extends StatefulWidget {
-  const ResizableBox({super.key});
+  const ResizableBox({Key? key}) : super(key: key);
 
   @override
   State<ResizableBox> createState() => ResizableBoxState();
@@ -21,6 +20,14 @@ class ResizableBoxState extends State<ResizableBox> {
         setState(() {
           _width += details.delta.dx;
           _height += details.delta.dy;
+
+          // Limit width and height
+          if (_width < 100) {
+            _width = 100;
+          }
+          if (_height < 100) {
+            _height = 100;
+          }
         });
       },
       child: Container(
