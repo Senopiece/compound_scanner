@@ -114,6 +114,7 @@ class _StaticImageScreenState extends State<StaticImageScreen> {
                       width: 60,
                       height: 60,
                       child: FloatingActionButton(
+                        heroTag: "gallery",
                         onPressed: () {
                           // reload this screen
                           setState(() {
@@ -129,6 +130,7 @@ class _StaticImageScreenState extends State<StaticImageScreen> {
                             width: 80,
                             height: 80,
                             child: FloatingActionButton(
+                              heroTag: "submit",
                               onPressed: () async {
                                 // TODO: forbid to run concurrent shots
                                 // crop it
@@ -152,15 +154,14 @@ class _StaticImageScreenState extends State<StaticImageScreen> {
                                   width: selection.width ~/ s,
                                   height: selection.height ~/ s,
                                 );
-                                final image =
-                                    Image.memory(img.encodePng(cropped));
 
                                 // display it on a new screen.
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        ResultScreen(image: image),
+                                    builder: (context) => ResultScreen(
+                                      imageBytes: img.encodePng(cropped),
+                                    ),
                                   ),
                                 );
                               },
@@ -173,6 +174,7 @@ class _StaticImageScreenState extends State<StaticImageScreen> {
                       width: 60,
                       height: 60,
                       child: FloatingActionButton(
+                        heroTag: "dismiss",
                         onPressed: () {
                           Navigator.pushReplacement(
                             context,

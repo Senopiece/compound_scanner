@@ -121,6 +121,7 @@ class _CameraPictureScreenState extends State<CameraPictureScreen> {
                       width: 60,
                       height: 60,
                       child: FloatingActionButton(
+                        heroTag: "gallery",
                         onPressed: () {
                           Navigator.pushReplacement(
                             context,
@@ -137,6 +138,7 @@ class _CameraPictureScreenState extends State<CameraPictureScreen> {
                       width: 80,
                       height: 80,
                       child: FloatingActionButton(
+                        heroTag: "shot",
                         onPressed: () async {
                           // TODO: forbid to run concurrent shots
                           await _initializeControllerFuture;
@@ -167,17 +169,17 @@ class _CameraPictureScreenState extends State<CameraPictureScreen> {
                             height: selection.height ~/ s,
                           );
 
-                          final drawn_image =
-                              Image.memory(imglib.encodePng(cropped));
-
                           // display it on a new screen.
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  ResultScreen(image: drawn_image),
-                            ),
-                          );
+                          if (context.mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ResultScreen(
+                                  imageBytes: imglib.encodePng(cropped),
+                                ),
+                              ),
+                            );
+                          }
                         },
                         child: const Icon(Icons.camera_alt),
                       ),
@@ -187,6 +189,7 @@ class _CameraPictureScreenState extends State<CameraPictureScreen> {
                       width: 60,
                       height: 60,
                       child: FloatingActionButton(
+                        heroTag: "flash",
                         onPressed: () async {
                           await _initializeControllerFuture;
                           if (_controller.value.flashMode == FlashMode.off) {

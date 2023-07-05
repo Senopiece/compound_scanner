@@ -12,6 +12,7 @@ dependencies:
   camera: ^0.10.5+2
   image: ^4.0.17
   image_picker: ^0.8.9
+  pytorch_lite: ^2.0.5
 
 dev_dependencies:
   flutter_test:
@@ -20,12 +21,15 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
 
 flutter_launcher_icons:
-  image_path: "icon.png"
+  image_path: "assets/img/icon.png"
   android: true
   # for some reason the default foreground generation didnt work for android,
   # so I manually pasted mipmaps generated on https://romannurik.github.io/AndroidAssetStudio/icons-launcher.html
-  # adaptive_icon_foreground: "foreground.png"
+  # adaptive_icon_foreground: "assets/img/foreground.png"
   adaptive_icon_background: "#171717"
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/models/model.ptl
