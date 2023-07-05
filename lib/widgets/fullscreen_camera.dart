@@ -100,8 +100,7 @@ class _FullscreenCameraState extends State<FullscreenCamera> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.done) {
           if (snapshot.hasError) {
-            // TODO: check does it go here
-            return const Center(child: Text("camera error"));
+            return const Center(child: Text("Camera Error"));
           }
           final size = MediaQuery.of(context).size;
           final previewSize = _previewSize();

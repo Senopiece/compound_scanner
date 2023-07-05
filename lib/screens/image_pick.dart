@@ -112,7 +112,11 @@ class _ImagePickScreenState extends State<ImagePickScreen>
                     if (preLatestCameraImage == null) setState(() {});
                   },
                 ),
-                Center(child: ResizableBox(key: _resizableBoxKey))
+                Center(
+                  child: _latestCameraImage != null
+                      ? ResizableBox(key: _resizableBoxKey)
+                      : null,
+                )
               ],
             )
           : const Center(),
