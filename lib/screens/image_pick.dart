@@ -52,7 +52,7 @@ class _ImagePickScreenState extends State<ImagePickScreen>
       case AppLifecycleState.paused:
         break;
       case AppLifecycleState.inactive:
-        _deactivateCamera();
+        if (_latestCameraImage != null) _deactivateCamera();
         break;
       case AppLifecycleState.detached:
         break;
