@@ -18,13 +18,15 @@ class PeekImageScreen extends StatefulWidget {
 }
 
 class _PeekImageScreenState extends State<PeekImageScreen> {
-  late Future<void> _imagePicking;
-  late img.Image _pickedImage;
+  img.Image? _pickedImage;
   final GlobalKey<ResizableBoxState> _resizableBoxKey =
       GlobalKey<ResizableBoxState>();
 
   Size _previewSize() {
-    return Size(_pickedImage.width.toDouble(), _pickedImage.height.toDouble());
+    return Size(
+      _pickedImage!.width.toDouble(),
+      _pickedImage!.height.toDouble(),
+    );
   }
 
   double _previewScale(Size contextSize, Size previewSize) {
@@ -35,10 +37,25 @@ class _PeekImageScreenState extends State<PeekImageScreen> {
   @override
   void initState() {
     super.initState();
-    _imagePicking = _pickImage();
+    _pickImage().then(
+      (pickedImage) {
+        if (pickedImage == null) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CameraPictureScreen(),
+            ),
+          );
+        } else {
+          setState(() {
+            _pickedImage = pickedImage;
+          });
+        }
+      },
+    );
   }
 
-  Future<void> _pickImage() async {
+  Future<img.Image?> _pickImage() async {
     final picker = ImagePicker();
     late XFile? pickedFile;
     try {
@@ -46,61 +63,57 @@ class _PeekImageScreenState extends State<PeekImageScreen> {
     } catch (e) {
       // TODO: handle storage permission exception and other stuff
       print(e);
-      return;
+      return null;
     }
     if (pickedFile == null) {
-      return;
+      return null;
     }
     final res = img.decodeImage(await pickedFile.readAsBytes());
     if (res == null) {
       print("TODO: alert got image, but cannot parse it");
-      return;
+      return null;
     }
-    setState(() => _pickedImage = res);
+    return res;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: FutureBuilder(
-        future: _imagePicking,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            final size = MediaQuery.of(context).size;
-            final previewSize = _previewSize();
-            final s = _previewScale(size, previewSize);
-            return Stack(
-              children: [
-                OverflowBox(
-                  minWidth: 0.0,
-                  minHeight: 0.0,
-                  maxWidth: double.infinity,
-                  maxHeight: double.infinity,
-                  child: SizedBox(
-                    width: s * previewSize.width,
-                    height: s * previewSize.height,
-                    child: Image.memory(img.encodePng(_pickedImage)),
-                  ),
-                ),
-                Center(
-                  child: ResizableBox(
-                    key: _resizableBoxKey,
-                  ),
-                ), // TODO: not only resizable, but also shiftable
-              ],
-            );
-          } else {
-            return const Center(child: CircularProgressIndicator());
-          }
-        },
-      ),
+      body: _pickedImage != null
+          ? Builder(
+              builder: (context) {
+                final size = MediaQuery.of(context).size;
+                final previewSize = _previewSize();
+                final s = _previewScale(size, previewSize);
+                return Stack(
+                  children: [
+                    OverflowBox(
+                      minWidth: 0.0,
+                      minHeight: 0.0,
+                      maxWidth: double.infinity,
+                      maxHeight: double.infinity,
+                      child: SizedBox(
+                        width: s * previewSize.width,
+                        height: s * previewSize.height,
+                        child: Image.memory(img.encodePng(_pickedImage!)),
+                      ),
+                    ),
+                    Center(
+                      child: ResizableBox(
+                        key: _resizableBoxKey,
+                      ),
+                    ), // TODO: not only resizable, but also shiftable
+                  ],
+                );
+              },
+            )
+          : const Center(
+              child: CircularProgressIndicator(),
+            ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: FutureBuilder(
-        future: _imagePicking,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            return Column(
+      floatingActionButton: _pickedImage != null
+          ? Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Row(
@@ -114,7 +127,13 @@ class _PeekImageScreenState extends State<PeekImageScreen> {
                         onPressed: () {
                           // reload this screen
                           setState(() {
-                            _imagePicking = _pickImage();
+                            final _backup = _pickedImage;
+                            _pickedImage = null;
+                            _pickImage().then((pickedImage) {
+                              setState(() {
+                                _pickedImage = pickedImage ?? _backup;
+                              });
+                            });
                           });
                         },
                         child: const Icon(Icons.browse_gallery),
@@ -136,7 +155,7 @@ class _PeekImageScreenState extends State<PeekImageScreen> {
                               _resizableBoxKey.currentState!.getSize();
 
                           final cropped = img.copyCrop(
-                            _pickedImage,
+                            _pickedImage!,
                             x: (0.5 * (previewSize.width - selection.width / s))
                                 .toInt(),
                             y: (0.5 *
@@ -182,12 +201,8 @@ class _PeekImageScreenState extends State<PeekImageScreen> {
                   height: 40,
                 ),
               ],
-            );
-          } else {
-            return const SizedBox();
-          }
-        },
-      ),
+            )
+          : const SizedBox(),
     );
   }
 }
