@@ -15,12 +15,14 @@ dependencies:
   pytorch_lite: ^2.0.5
   firebase_core: ^2.14.0
   firebase_crashlytics: ^3.3.3
-
+  tflite_flutter: ^0.10.1
+  # tflite_flutter_helper_plus: ^0.0.2
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
-  flutter_launcher_icons: ^0.13.1
+  # flutter_launcher_icons: ^0.13.1
 
 flutter_launcher_icons:
   image_path: "assets/img/icon.png"
@@ -34,4 +36,6 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/models/encoder.tflite
+    - assets/models/decoder.tflite
     - assets/models/model.ptl
