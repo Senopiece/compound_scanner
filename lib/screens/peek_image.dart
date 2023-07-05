@@ -5,20 +5,20 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image/image.dart' as img;
 
-import '../resizable_box.dart';
+import '../widgets/resizable_box.dart';
 import 'camera_picture.dart';
 
-class StaticImageScreen extends StatefulWidget {
-  const StaticImageScreen({
+class PeekImageScreen extends StatefulWidget {
+  const PeekImageScreen({
     Key? key,
   }) : super(key: key);
 
   @override
-  State<StaticImageScreen> createState() => _StaticImageScreenState();
+  State<PeekImageScreen> createState() => _PeekImageScreenState();
 }
 
-class _StaticImageScreenState extends State<StaticImageScreen> {
-  late Future<img.Image?> _imagePicking;
+class _PeekImageScreenState extends State<PeekImageScreen> {
+  late Future<void> _imagePicking;
   late img.Image _pickedImage;
   final GlobalKey<ResizableBoxState> _resizableBoxKey =
       GlobalKey<ResizableBoxState>();
@@ -38,7 +38,7 @@ class _StaticImageScreenState extends State<StaticImageScreen> {
     _imagePicking = _pickImage();
   }
 
-  Future<img.Image?> _pickImage() async {
+  Future<void> _pickImage() async {
     final picker = ImagePicker();
     late XFile? pickedFile;
     try {
@@ -46,32 +46,27 @@ class _StaticImageScreenState extends State<StaticImageScreen> {
     } catch (e) {
       // TODO: handle storage permission exception and other stuff
       print(e);
-      return null;
+      return;
     }
     if (pickedFile == null) {
-      return null;
+      return;
     }
     final res = img.decodeImage(await pickedFile.readAsBytes());
     if (res == null) {
       print("TODO: alert got image, but cannot parse it");
-      return null;
+      return;
     }
-    _pickedImage = res;
-    return res;
+    setState(() => _pickedImage = res);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: FutureBuilder<img.Image?>(
+      body: FutureBuilder(
         future: _imagePicking,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
-            if (snapshot.data == null) {
-              return const Center(child: Text("< No image selected >"));
-            }
-
             final size = MediaQuery.of(context).size;
             final previewSize = _previewSize();
             final s = _previewScale(size, previewSize);
@@ -85,13 +80,14 @@ class _StaticImageScreenState extends State<StaticImageScreen> {
                   child: SizedBox(
                     width: s * previewSize.width,
                     height: s * previewSize.height,
-                    child: Image.memory(img.encodePng(snapshot.data!)),
+                    child: Image.memory(img.encodePng(_pickedImage)),
                   ),
                 ),
                 Center(
-                    child: ResizableBox(
-                        key:
-                            _resizableBoxKey)), // TODO: not only resizable, but also shiftable
+                  child: ResizableBox(
+                    key: _resizableBoxKey,
+                  ),
+                ), // TODO: not only resizable, but also shiftable
               ],
             );
           } else {
@@ -100,7 +96,7 @@ class _StaticImageScreenState extends State<StaticImageScreen> {
         },
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: FutureBuilder<img.Image?>(
+      floatingActionButton: FutureBuilder(
         future: _imagePicking,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
@@ -125,50 +121,44 @@ class _StaticImageScreenState extends State<StaticImageScreen> {
                       ),
                     ),
                     const SizedBox(width: 30),
-                    snapshot.data != null
-                        ? SizedBox(
-                            width: 80,
-                            height: 80,
-                            child: FloatingActionButton(
-                              heroTag: "submit",
-                              onPressed: () async {
-                                // TODO: forbid to run concurrent shots
-                                // crop it
-                                final size = MediaQuery.of(context).size;
-                                final previewSize = _previewSize();
-                                final s = _previewScale(size, previewSize);
+                    SizedBox(
+                      width: 80,
+                      height: 80,
+                      child: FloatingActionButton(
+                        heroTag: "submit",
+                        onPressed: () {
+                          // crop it
+                          final size = MediaQuery.of(context).size;
+                          final previewSize = _previewSize();
+                          final s = _previewScale(size, previewSize);
 
-                                final selection =
-                                    _resizableBoxKey.currentState!.getSize();
+                          final selection =
+                              _resizableBoxKey.currentState!.getSize();
 
-                                final cropped = img.copyCrop(
-                                  _pickedImage,
-                                  x: (0.5 *
-                                          (previewSize.width -
-                                              selection.width / s))
-                                      .toInt(),
-                                  y: (0.5 *
-                                          (previewSize.height -
-                                              selection.height / s))
-                                      .toInt(),
-                                  width: selection.width ~/ s,
-                                  height: selection.height ~/ s,
-                                );
+                          final cropped = img.copyCrop(
+                            _pickedImage,
+                            x: (0.5 * (previewSize.width - selection.width / s))
+                                .toInt(),
+                            y: (0.5 *
+                                    (previewSize.height - selection.height / s))
+                                .toInt(),
+                            width: selection.width ~/ s,
+                            height: selection.height ~/ s,
+                          );
 
-                                // display it on a new screen.
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ResultScreen(
-                                      imageBytes: img.encodePng(cropped),
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: const Icon(Icons.check),
+                          // display it on a new screen.
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ResultScreen(
+                                imageBytes: img.encodePng(cropped),
+                              ),
                             ),
-                          )
-                        : const SizedBox(width: 30),
+                          );
+                        },
+                        child: const Icon(Icons.check),
+                      ),
+                    ),
                     const SizedBox(width: 30),
                     SizedBox(
                       width: 60,
