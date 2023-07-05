@@ -13,6 +13,8 @@ dependencies:
   image: ^4.0.17
   image_picker: ^0.8.9
   pytorch_lite: ^2.0.5
+  firebase_core: ^2.14.0
+  firebase_crashlytics: ^3.3.3
 
 dev_dependencies:
   flutter_test:

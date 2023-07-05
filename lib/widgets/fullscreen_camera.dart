@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
+// TODO: blinking when camera permission is not granted (mb ImagePick problem)
 class FullscreenCamera extends StatefulWidget {
   final void Function(Size, double, int, CameraImage) onCameraImageCallback;
   final bool flash;
@@ -36,30 +37,35 @@ class _FullscreenCameraState extends State<FullscreenCamera> {
 
   Future<void> _ctrlFut() async {
     // TODO: in case no cam, report about it
-    final cameras = await availableCameras();
-    late CameraDescription frontCamera;
-    for (CameraDescription camera in cameras) {
-      if (camera.lensDirection == CameraLensDirection.back) {
-        frontCamera = camera;
-        break;
-      }
-    }
-    _controller = CameraController(
-      frontCamera,
-      ResolutionPreset.high,
-      enableAudio: false,
-    );
-    await _controller!.initialize();
-    await _controller!
-        .setFlashMode(widget.flash ? FlashMode.torch : FlashMode.off);
-    _controller!.startImageStream(
-      (image) {
-        if (cameraPreviewScale != null && _controller != null) {
-          widget.onCameraImageCallback(_previewSize(), cameraPreviewScale!,
-              _controller!.description.sensorOrientation, image);
+    try {
+      final cameras = await availableCameras();
+      late CameraDescription frontCamera;
+      for (CameraDescription camera in cameras) {
+        if (camera.lensDirection == CameraLensDirection.back) {
+          frontCamera = camera;
+          break;
         }
-      },
-    );
+      }
+      _controller = CameraController(
+        frontCamera,
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
+      await _controller!.initialize();
+      await _controller!
+          .setFlashMode(widget.flash ? FlashMode.torch : FlashMode.off);
+      _controller!.startImageStream(
+        (image) {
+          if (cameraPreviewScale != null && _controller != null) {
+            widget.onCameraImageCallback(_previewSize(), cameraPreviewScale!,
+                _controller!.description.sensorOrientation, image);
+          }
+        },
+      );
+    } catch (e) {
+      _controller = null;
+      rethrow;
+    }
   }
 
   @override

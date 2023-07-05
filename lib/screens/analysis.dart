@@ -24,17 +24,18 @@ class AnalysisScreen extends StatelessWidget {
           children: [
             SizedBox(child: Image.memory(imageBytes)),
             FutureBuilder(
-                future: _analyze(imageBytes),
-                builder: (context, snap) {
-                  if (snap.hasError) {
-                    print(snap.error);
-                    return const Text("Error");
-                  } else if (snap.hasData) {
-                    return Text(snap.data!);
-                  } else {
-                    return const CircularProgressIndicator();
-                  }
-                }),
+              future: _analyze(imageBytes),
+              builder: (context, snap) {
+                if (snap.hasError) {
+                  print(snap.error);
+                  return const Text("Error");
+                } else if (snap.hasData) {
+                  return Text(snap.data!);
+                } else {
+                  return const CircularProgressIndicator();
+                }
+              },
+            ),
           ],
         ),
       ),

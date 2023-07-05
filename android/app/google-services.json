@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "791276023733",
+    "project_id": "compound-scanner",
+    "storage_bucket": "compound-scanner.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:791276023733:android:d0cff457ad0876012ab3fc",
+        "android_client_info": {
+          "package_name": "com.example.compound_scanner"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "791276023733-421tnao11138nasaodktlgeg4fgu499p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCm1QLz697evth-5HAmjrqzG7U45XdB03w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "791276023733-421tnao11138nasaodktlgeg4fgu499p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
