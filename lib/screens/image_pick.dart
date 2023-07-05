@@ -128,7 +128,6 @@ class _ImagePickScreenState extends State<ImagePickScreen>
                 height: 60,
                 child: ElevatedButton(
                   onPressed: () async {
-                    _deactivateCamera();
                     final pickedImage = await _pickImage();
                     if (context.mounted && pickedImage != null) {
                       Navigator.push(
@@ -140,8 +139,6 @@ class _ImagePickScreenState extends State<ImagePickScreen>
                           ),
                         ),
                       );
-                    } else {
-                      _activateCamera();
                     }
                   },
                   child: const Icon(Icons.browse_gallery),

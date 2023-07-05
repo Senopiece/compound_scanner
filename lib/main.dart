@@ -7,7 +7,10 @@ Future<void> main() async {
   runApp(
     MaterialApp(
       theme: ThemeData.dark(),
-      home: const ImagePickScreen(),
+      onGenerateRoute: (settings) => MaterialPageRoute(
+        maintainState: false,
+        builder: (context) => const ImagePickScreen(),
+      ),
     ),
   );
 }
