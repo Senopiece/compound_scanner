@@ -1,4 +1,4 @@
-import 'package:compound_scanner/screens/camera_picture.dart';
+import 'screens/image_pick.dart';
 import 'package:flutter/material.dart';
 
 Future<void> main() async {
@@ -7,7 +7,7 @@ Future<void> main() async {
   runApp(
     MaterialApp(
       theme: ThemeData.dark(),
-      home: const CameraPictureScreen(),
+      home: const ImagePickScreen(),
     ),
   );
 }

@@ -1,25 +1,23 @@
-import 'dart:math';
-
-import 'package:compound_scanner/screens/scan_result.dart';
-import 'package:compound_scanner/utils/conversions.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-
-import '../widgets/resizable_box.dart';
 import 'package:image/image.dart' as imglib;
-
 import 'package:image_picker/image_picker.dart';
 
-class CameraPictureScreen extends StatefulWidget {
-  const CameraPictureScreen({
+import '../utils/conversions.dart';
+import '../screens/analysis.dart';
+import '../widgets/fullscreen_camera.dart';
+import '../widgets/resizable_box.dart';
+
+class ImagePickScreen extends StatefulWidget {
+  const ImagePickScreen({
     Key? key,
   }) : super(key: key);
 
   @override
-  State<CameraPictureScreen> createState() => _CameraPictureScreenState();
+  State<ImagePickScreen> createState() => _ImagePickScreenState();
 }
 
-class _CameraPictureScreenState extends State<CameraPictureScreen> {
+class _ImagePickScreenState extends State<ImagePickScreen> {
   bool _isCameraActive = true; // may be active, but still with error
   bool _flash = false;
 
@@ -33,19 +31,17 @@ class _CameraPictureScreenState extends State<CameraPictureScreen> {
       GlobalKey<ResizableBoxState>();
 
   void _deactivateCamera() {
-    setState(() {
-      _isCameraActive = false;
-      _latestCameraImageSize = null;
-      _latestCameraImageScale = null;
-      _latestCameraOrientation = null;
-      _latestCameraImage = null;
-    });
+    _isCameraActive = false;
+    _latestCameraImageSize = null;
+    _latestCameraImageScale = null;
+    _latestCameraOrientation = null;
+    _latestCameraImage = null;
+    setState(() {});
   }
 
   void _activateCamera() {
-    setState(() {
-      _isCameraActive = true;
-    });
+    _isCameraActive = true;
+    setState(() {});
   }
 
   Future<imglib.Image?> _pickImage() async {
@@ -76,7 +72,7 @@ class _CameraPictureScreenState extends State<CameraPictureScreen> {
       body: _isCameraActive
           ? Stack(
               children: [
-                _FullscreenCameraWidget(
+                FullscreenCamera(
                   flash: _flash,
                   onCameraImageCallback: (size, scale, orientation, img) {
                     final preLatestCameraImage = _latestCameraImage;
@@ -111,7 +107,7 @@ class _CameraPictureScreenState extends State<CameraPictureScreen> {
                         context,
                         MaterialPageRoute(
                           maintainState: false,
-                          builder: (context) => ResultScreen(
+                          builder: (context) => AnalysisScreen(
                             imageBytes: imglib.encodePng(pickedImage),
                           ),
                         ),
@@ -165,7 +161,7 @@ class _CameraPictureScreenState extends State<CameraPictureScreen> {
                         context,
                         MaterialPageRoute(
                           maintainState: false,
-                          builder: (context) => ResultScreen(
+                          builder: (context) => AnalysisScreen(
                             imageBytes: imglib.encodePng(cropped),
                           ),
                         ),
@@ -201,123 +197,6 @@ class _CameraPictureScreenState extends State<CameraPictureScreen> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _FullscreenCameraWidget extends StatefulWidget {
-  final void Function(Size, double, int, CameraImage) onCameraImageCallback;
-  final bool flash;
-
-  const _FullscreenCameraWidget({
-    Key? key,
-    required this.flash,
-    required this.onCameraImageCallback,
-  }) : super(key: key);
-
-  @override
-  State<_FullscreenCameraWidget> createState() =>
-      _FullscreenCameraWidgetState();
-}
-
-class _FullscreenCameraWidgetState extends State<_FullscreenCameraWidget> {
-  late Future<void> _initializeControllerFuture;
-  CameraController? _controller;
-  double? cameraPreviewScale;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeControllerFuture = _ctrlFut();
-  }
-
-  @override
-  void didUpdateWidget(covariant _FullscreenCameraWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _controller?.setFlashMode(widget.flash ? FlashMode.torch : FlashMode.off);
-  }
-
-  Future<void> _ctrlFut() async {
-    // TODO: in case no cam, report about it
-    final cameras = await availableCameras();
-    late CameraDescription frontCamera;
-    for (CameraDescription camera in cameras) {
-      if (camera.lensDirection == CameraLensDirection.back) {
-        frontCamera = camera;
-        break;
-      }
-    }
-    _controller = CameraController(
-      frontCamera,
-      ResolutionPreset.high,
-      enableAudio: false,
-    );
-    await _controller!.initialize();
-    await _controller!
-        .setFlashMode(widget.flash ? FlashMode.torch : FlashMode.off);
-    _controller!.startImageStream(
-      (image) {
-        if (cameraPreviewScale != null && _controller != null) {
-          widget.onCameraImageCallback(_previewSize(), cameraPreviewScale!,
-              _controller!.description.sensorOrientation, image);
-        }
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller?.stopImageStream();
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  Size _previewSize() {
-    final so = _controller!.value.description.sensorOrientation;
-    var previewSize = _controller!.value.previewSize!;
-    if (so % 180 != 0) {
-      // aka so in (90, 270)
-      // need to swap orientation
-      previewSize = Size(previewSize.height, previewSize.width);
-    }
-    return previewSize;
-  }
-
-  double _previewScale(Size contextSize, Size previewSize) {
-    return max(
-      contextSize.height / previewSize.height,
-      contextSize.width / previewSize.width,
-    ); // like BoxFit.cover
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<void>(
-      future: _initializeControllerFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.done) {
-          if (snapshot.hasError) {
-            // TODO: check does it go here
-            return const Center(child: Text("camera error"));
-          }
-          final size = MediaQuery.of(context).size;
-          final previewSize = _previewSize();
-          cameraPreviewScale = _previewScale(size, previewSize);
-          return OverflowBox(
-            minWidth: 0.0,
-            minHeight: 0.0,
-            maxWidth: double.infinity,
-            maxHeight: double.infinity,
-            child: SizedBox(
-              width: cameraPreviewScale! * previewSize.width,
-              height: cameraPreviewScale! * previewSize.height,
-              child: CameraPreview(_controller!),
-            ),
-          );
-        } else {
-          return const Center(child: CircularProgressIndicator());
-        }
-      },
     );
   }
 }

@@ -1,0 +1,120 @@
+import 'dart:math';
+
+import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
+
+class FullscreenCamera extends StatefulWidget {
+  final void Function(Size, double, int, CameraImage) onCameraImageCallback;
+  final bool flash;
+
+  const FullscreenCamera({
+    Key? key,
+    required this.flash,
+    required this.onCameraImageCallback,
+  }) : super(key: key);
+
+  @override
+  State<FullscreenCamera> createState() => _FullscreenCameraState();
+}
+
+class _FullscreenCameraState extends State<FullscreenCamera> {
+  late Future<void> _initializeControllerFuture;
+  CameraController? _controller;
+  double? cameraPreviewScale;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeControllerFuture = _ctrlFut();
+  }
+
+  @override
+  void didUpdateWidget(covariant FullscreenCamera oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _controller?.setFlashMode(widget.flash ? FlashMode.torch : FlashMode.off);
+  }
+
+  Future<void> _ctrlFut() async {
+    // TODO: in case no cam, report about it
+    final cameras = await availableCameras();
+    late CameraDescription frontCamera;
+    for (CameraDescription camera in cameras) {
+      if (camera.lensDirection == CameraLensDirection.back) {
+        frontCamera = camera;
+        break;
+      }
+    }
+    _controller = CameraController(
+      frontCamera,
+      ResolutionPreset.high,
+      enableAudio: false,
+    );
+    await _controller!.initialize();
+    await _controller!
+        .setFlashMode(widget.flash ? FlashMode.torch : FlashMode.off);
+    _controller!.startImageStream(
+      (image) {
+        if (cameraPreviewScale != null && _controller != null) {
+          widget.onCameraImageCallback(_previewSize(), cameraPreviewScale!,
+              _controller!.description.sensorOrientation, image);
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller?.stopImageStream();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Size _previewSize() {
+    final so = _controller!.value.description.sensorOrientation;
+    var previewSize = _controller!.value.previewSize!;
+    if (so % 180 != 0) {
+      // aka so in (90, 270)
+      // need to swap orientation
+      previewSize = Size(previewSize.height, previewSize.width);
+    }
+    return previewSize;
+  }
+
+  double _previewScale(Size contextSize, Size previewSize) {
+    return max(
+      contextSize.height / previewSize.height,
+      contextSize.width / previewSize.width,
+    ); // like BoxFit.cover
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _initializeControllerFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done) {
+          if (snapshot.hasError) {
+            // TODO: check does it go here
+            return const Center(child: Text("camera error"));
+          }
+          final size = MediaQuery.of(context).size;
+          final previewSize = _previewSize();
+          cameraPreviewScale = _previewScale(size, previewSize);
+          return OverflowBox(
+            minWidth: 0.0,
+            minHeight: 0.0,
+            maxWidth: double.infinity,
+            maxHeight: double.infinity,
+            child: SizedBox(
+              width: cameraPreviewScale! * previewSize.width,
+              height: cameraPreviewScale! * previewSize.height,
+              child: CameraPreview(_controller!),
+            ),
+          );
+        } else {
+          return const Center(child: CircularProgressIndicator());
+        }
+      },
+    );
+  }
+}

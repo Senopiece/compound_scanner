@@ -3,10 +3,10 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:pytorch_lite/pytorch_lite.dart';
 
-class ResultScreen extends StatelessWidget {
+class AnalysisScreen extends StatelessWidget {
   final Uint8List imageBytes;
 
-  const ResultScreen({Key? key, required this.imageBytes}) : super(key: key);
+  const AnalysisScreen({Key? key, required this.imageBytes}) : super(key: key);
 
   static Future<String> _analyze(Uint8List imageBytes) async {
     final model = await PytorchLite.loadClassificationModel(
