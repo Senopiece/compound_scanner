@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -23,12 +24,8 @@ class AnalysisScreen extends StatelessWidget {
   const AnalysisScreen({Key? key, required this.imageBytes}) : super(key: key);
 
   static Future<String> _analyze(Uint8List imageBytes) async {
-    // final model = await FlutterPytorch.loadClassificationModel(
-    //     "assets/models/model.ptl", 260, 260);
-    // return (await model.getImagePredictionList(imageBytes)).toString();
-
     // encode
-    late Uint8List features;
+    late List<List<double>> featuresReshaped;
     {
       final interpreter =
           await Interpreter.fromAsset('assets/models/encoder.tflite');
@@ -38,7 +35,7 @@ class AnalysisScreen extends StatelessWidget {
       final inputH = input.shape[2];
       final inputDepth = input.shape[3];
 
-      final image = imglib.decodePng(imageBytes);
+      final image = imglib.decodeImage(imageBytes);
 
       if (image == null) {
         interpreter.close();
@@ -55,7 +52,10 @@ class AnalysisScreen extends StatelessWidget {
         width: inputW,
         height: inputH,
       );
-      final inputImage = Float32List(inputW * inputH * inputDepth);
+      final inputImage = List.generate(
+          inputW,
+          (index) => List.generate(
+              inputH, (index) => List<int>.filled(inputDepth, 0)));
 
       if (input.type != TensorType.float32) {
         interpreter.close();
@@ -63,58 +63,102 @@ class AnalysisScreen extends StatelessWidget {
       }
 
       // Normalize the image pixel values and convert them to a Float32List
-      int pixelIndex = 0;
+      // int pixelIndex = 0;
+      num average = 0;
       for (var y = 0; y < inputW; y++) {
         for (var x = 0; x < inputH; x++) {
           final pixel = resizedImage.getPixel(x, y);
-          inputImage[pixelIndex++] = pixel.r / 255.0;
-          inputImage[pixelIndex++] = pixel.g / 255.0;
-          inputImage[pixelIndex++] = pixel.b / 255.0;
+          inputImage[x][y][0] = pixel.r.toInt();
+          inputImage[x][y][1] = pixel.g.toInt();
+          inputImage[x][y][2] = pixel.b.toInt();
+          average += pixel.b.toInt();
         }
       }
+      average /= inputW * inputH;
+      // print(inputImage[0][0]);
+      print(average);
+      print(inspect(inputImage));
 
-      input.data = inputImage.buffer.asUint8List();
+      // input.data = inputImage.buffer.asUint8List();
 
-      final output = interpreter.getOutputTensor(0);
-      interpreter.invoke();
-      features = output.data;
+      final outputTensor = interpreter.getOutputTensor(0);
+      var output = [
+        List.generate(outputTensor.shape[1],
+            (index) => List<double>.filled(outputTensor.shape[2], 0))
+      ];
+      interpreter.run([inputImage], output);
+      final features = output;
+      featuresReshaped = features[0];
 
-      print(output.type);
+      print(outputTensor.shape);
+      print(outputTensor.type);
+      print(output[0][0]);
 
       interpreter.close();
     }
 
+    // get initial state
+    late List<double> hiddenState, memoryState;
+    {
+      final interpreter =
+          await Interpreter.fromAsset('assets/models/isg.tflite');
+
+      print(interpreter.getOutputTensors());
+      final outputs = {
+        0: [List<double>.filled(1024, 0)], // hidden
+        1: [List<double>.filled(1024, 0)] // memory
+      };
+      interpreter.runForMultipleInputs([
+        [featuresReshaped]
+      ], outputs);
+      hiddenState = outputs[0]![0];
+      memoryState = outputs[1]![0];
+      // print(hiddenState);
+      // print(memoryState);
+    }
+
     // decode
-    var res = "";
+    String res = token_map.map[1];
     {
       final interpreter =
           await Interpreter.fromAsset('assets/models/decoder.tflite');
 
-      final input = interpreter.getInputTensor(0);
+      // final encoderMean = features.reduce((a, b) => a + b) / features.length;
 
-      if (input.type != TensorType.float32) {
-        interpreter.close();
-        return "failed decoder.input.type != float32";
-      }
+      var tokenProbabilities = List<double>.filled(197, 0);
+      var hidden = hiddenState;
+      var memory = memoryState;
+      var prevPred = 1;
+      for (var i = 0; i < 10; i++) {
+        final outputs = {
+          1: [tokenProbabilities], // token probabilities
+          0: [List<double>.filled(1024, 0)], // hidden
+          2: [List<double>.filled(1024, 0)], // memory
+        };
 
-      if (input.shape[0] != 1) {
-        interpreter.close();
-        return "failed decoder.shape[0] != 1";
-      }
+        interpreter.runForMultipleInputs(
+          [
+            [
+              [prevPred]
+            ],
+            [featuresReshaped], // image features
+            [hidden], // hidden
+            [memory], // memory
+          ],
+          outputs,
+        );
 
-      if (input.numBytes() % features.length == 0) {
-        interpreter.close();
-        return "failed decoder.len % features.length";
-      }
+        memory = outputs[2]![0];
+        hidden = outputs[0]![0];
+        tokenProbabilities = outputs[1]![0];
 
-      for (int s = 0; s != features.lengthInBytes; s += input.numBytes()) {
-        input.data = features.sublist(s, s + input.numBytes());
-        final output = interpreter.getOutputTensor(0);
-        interpreter.invoke();
-        final list = output.data.buffer.asFloat32List();
-        print(list);
-        print(argmax(list));
-        final symbol = token_map.map[argmax(list)];
+        // print(hidden);
+        // print(memory);
+        // print(tokenProbabilities);
+
+        prevPred = argmax(tokenProbabilities);
+        final symbol = token_map.map[prevPred];
+        print(symbol);
         if (symbol == "<END>") break;
         res += symbol;
       }
