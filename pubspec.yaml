@@ -38,4 +38,4 @@ flutter:
   assets:
     - assets/models/encoder.tflite
     - assets/models/decoder.tflite
-    - assets/models/model.ptl
+    - assets/models/isg.tflite

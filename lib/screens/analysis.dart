@@ -47,6 +47,7 @@ class AnalysisScreen extends StatelessWidget {
         return "fail img != rgb";
       }
 
+      // TODO: resize by filling gaps
       final resizedImage = imglib.copyResize(
         image,
         width: inputW,
@@ -65,12 +66,12 @@ class AnalysisScreen extends StatelessWidget {
       // Normalize the image pixel values and convert them to a Float32List
       // int pixelIndex = 0;
       num average = 0;
-      for (var y = 0; y < inputW; y++) {
-        for (var x = 0; x < inputH; x++) {
+      for (var y = 0; y < inputH; y++) {
+        for (var x = 0; x < inputW; x++) {
           final pixel = resizedImage.getPixel(x, y);
-          inputImage[x][y][0] = pixel.r.toInt();
-          inputImage[x][y][1] = pixel.g.toInt();
-          inputImage[x][y][2] = pixel.b.toInt();
+          inputImage[y][x][0] = pixel.r.toInt();
+          inputImage[y][x][1] = pixel.g.toInt();
+          inputImage[y][x][2] = pixel.b.toInt();
           average += pixel.b.toInt();
         }
       }
@@ -92,7 +93,6 @@ class AnalysisScreen extends StatelessWidget {
 
       print(outputTensor.shape);
       print(outputTensor.type);
-      print(output[0][0]);
 
       interpreter.close();
     }
@@ -129,7 +129,7 @@ class AnalysisScreen extends StatelessWidget {
       var hidden = hiddenState;
       var memory = memoryState;
       var prevPred = 1;
-      for (var i = 0; i < 10; i++) {
+      for (var i = 0; i < 300; i++) {
         final outputs = {
           1: [tokenProbabilities], // token probabilities
           0: [List<double>.filled(1024, 0)], // hidden
@@ -142,8 +142,8 @@ class AnalysisScreen extends StatelessWidget {
               [prevPred]
             ],
             [featuresReshaped], // image features
-            [hidden], // hidden
-            [memory], // memory
+            [memory], // hidden
+            [hidden], // memory
           ],
           outputs,
         );
@@ -152,9 +152,9 @@ class AnalysisScreen extends StatelessWidget {
         hidden = outputs[0]![0];
         tokenProbabilities = outputs[1]![0];
 
-        // print(hidden);
-        // print(memory);
-        // print(tokenProbabilities);
+        print(hidden);
+        print(memory);
+        print(tokenProbabilities);
 
         prevPred = argmax(tokenProbabilities);
         final symbol = token_map.map[prevPred];
@@ -166,6 +166,7 @@ class AnalysisScreen extends StatelessWidget {
       interpreter.close();
     }
 
+    print(res);
     return res;
   }
 
