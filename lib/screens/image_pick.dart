@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:image/image.dart' as imglib;
@@ -17,9 +19,7 @@ class ImagePickScreen extends StatefulWidget {
   State<ImagePickScreen> createState() => _ImagePickScreenState();
 }
 
-class _ImagePickScreenState extends State<ImagePickScreen>
-    with WidgetsBindingObserver {
-  bool _isCameraActive = true; // may be active, but still with error
+class _ImagePickScreenState extends State<ImagePickScreen> {
   bool _flash = false;
 
   // these are remaining null in case camera is active with error
@@ -34,46 +34,14 @@ class _ImagePickScreenState extends State<ImagePickScreen>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    switch (state) {
-      case AppLifecycleState.resumed:
-        _activateCamera();
-        break;
-      case AppLifecycleState.paused:
-        break;
-      case AppLifecycleState.inactive:
-        if (_latestCameraImage != null) _deactivateCamera();
-        break;
-      case AppLifecycleState.detached:
-        break;
-    }
-  }
-
-  void _deactivateCamera() {
-    _isCameraActive = false;
-    _latestCameraImageSize = null;
-    _latestCameraImageScale = null;
-    _latestCameraOrientation = null;
-    _latestCameraImage = null;
-    setState(() {});
-  }
-
-  void _activateCamera() {
-    _isCameraActive = true;
-    setState(() {});
-  }
-
-  Future<imglib.Image?> _pickImage() async {
+  Future<Uint8List?> _pickImage() async {
     final picker = ImagePicker();
     late XFile? pickedFile;
     try {
@@ -86,11 +54,7 @@ class _ImagePickScreenState extends State<ImagePickScreen>
     if (pickedFile == null) {
       return null;
     }
-    final res = imglib.decodeImage(await pickedFile.readAsBytes());
-    if (res == null) {
-      print("TODO: alert got image, but cannot parse it");
-      return null;
-    }
+    final res = await pickedFile.readAsBytes();
     return res;
   }
 
@@ -98,28 +62,26 @@ class _ImagePickScreenState extends State<ImagePickScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: _isCameraActive
-          ? Stack(
-              children: [
-                FullscreenCamera(
-                  flash: _flash,
-                  onCameraImageCallback: (size, scale, orientation, img) {
-                    final preLatestCameraImage = _latestCameraImage;
-                    _latestCameraImageSize = size;
-                    _latestCameraImageScale = scale;
-                    _latestCameraOrientation = orientation;
-                    _latestCameraImage = img;
-                    if (preLatestCameraImage == null) setState(() {});
-                  },
-                ),
-                Center(
-                  child: _latestCameraImage != null
-                      ? ResizableBox(key: _resizableBoxKey)
-                      : null,
-                )
-              ],
-            )
-          : const Center(),
+      body: Stack(
+        children: [
+          FullscreenCamera(
+            flash: _flash,
+            onCameraImageCallback: (size, scale, orientation, img) {
+              final preLatestCameraImage = _latestCameraImage;
+              _latestCameraImageSize = size;
+              _latestCameraImageScale = scale;
+              _latestCameraOrientation = orientation;
+              _latestCameraImage = img;
+              if (preLatestCameraImage == null) setState(() {});
+            },
+          ),
+          Center(
+            child: _latestCameraImage != null
+                ? ResizableBox(key: _resizableBoxKey)
+                : null,
+          )
+        ],
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -132,14 +94,14 @@ class _ImagePickScreenState extends State<ImagePickScreen>
                 height: 60,
                 child: ElevatedButton(
                   onPressed: () async {
-                    final pickedImage = await _pickImage();
-                    if (context.mounted && pickedImage != null) {
+                    final pickedImageBytes = await _pickImage();
+                    if (context.mounted && pickedImageBytes != null) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           maintainState: false,
                           builder: (context) => AnalysisScreen(
-                            imageBytes: imglib.encodePng(pickedImage),
+                            imageBytes: pickedImageBytes,
                           ),
                         ),
                       );

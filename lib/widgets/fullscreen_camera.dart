@@ -18,15 +18,63 @@ class FullscreenCamera extends StatefulWidget {
   State<FullscreenCamera> createState() => _FullscreenCameraState();
 }
 
-class _FullscreenCameraState extends State<FullscreenCamera> {
-  late Future<void> _initializeControllerFuture;
+class _FullscreenCameraState extends State<FullscreenCamera>
+    with WidgetsBindingObserver {
+  bool wasPaused = false;
+  Future<void>? _initializeControllerFuture;
   CameraController? _controller;
   double? cameraPreviewScale;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // filter only resume after paused
+        // as it may go here also after inactive (that happens on rejected camera permission)
+        if (wasPaused) {
+          if (_initializeControllerFuture == null) {
+            setState(() {
+              _initializeControllerFuture = _ctrlFut();
+            });
+          } else {
+            _initializeControllerFuture!.whenComplete(() {
+              setState(() {
+                _initializeControllerFuture = _ctrlFut();
+              });
+            });
+          }
+        }
+        break;
+      case AppLifecycleState.paused:
+        _initializeControllerFuture?.whenComplete(() {
+          setState(() {
+            _initializeControllerFuture = null;
+            _controller?.stopImageStream();
+            _controller?.dispose();
+          });
+        });
+        break;
+      case AppLifecycleState.inactive:
+        break;
+      case AppLifecycleState.detached:
+        break;
+    }
+    wasPaused = (state == AppLifecycleState.paused);
+  }
 
   @override
   void initState() {
     super.initState();
     _initializeControllerFuture = _ctrlFut();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    _controller?.stopImageStream();
+    _controller?.dispose();
+    super.dispose();
+    WidgetsBinding.instance.removeObserver(this);
   }
 
   @override
@@ -63,16 +111,10 @@ class _FullscreenCameraState extends State<FullscreenCamera> {
         },
       );
     } catch (e) {
+      _controller?.dispose();
       _controller = null;
       rethrow;
     }
-  }
-
-  @override
-  void dispose() {
-    _controller?.stopImageStream();
-    _controller?.dispose();
-    super.dispose();
   }
 
   Size _previewSize() {
@@ -113,7 +155,9 @@ class _FullscreenCameraState extends State<FullscreenCamera> {
             child: SizedBox(
               width: cameraPreviewScale! * previewSize.width,
               height: cameraPreviewScale! * previewSize.height,
-              child: CameraPreview(_controller!),
+              child: _controller != null
+                  ? CameraPreview(_controller!)
+                  : const Center(),
             ),
           );
         } else {
