@@ -50,7 +50,13 @@ class ResizableBoxState extends State<ResizableBox> {
             width: _width,
             height: _height,
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.blue),
+              color: const Color.fromARGB(255, 0, 0, 0),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                width: 3,
+                color: const Color.fromARGB(200, 0, 0, 0),
+                strokeAlign: BorderSide.strokeAlignOutside,
+              ),
             ),
           ),
         );

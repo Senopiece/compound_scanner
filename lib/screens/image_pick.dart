@@ -75,10 +75,25 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
               if (preLatestCameraImage == null) setState(() {});
             },
           ),
-          Center(
-            child: _latestCameraImage != null
-                ? ResizableBox(key: _resizableBoxKey)
-                : null,
+          ColorFiltered(
+            colorFilter: const ColorFilter.mode(
+              Colors.black54,
+              BlendMode.srcOut,
+            ),
+            child: _latestCameraImage == null
+                ? null
+                : Stack(
+                    children: [
+                      Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.transparent,
+                        ),
+                      ),
+                      Center(
+                        child: ResizableBox(key: _resizableBoxKey),
+                      ),
+                    ],
+                  ),
           )
         ],
       ),
