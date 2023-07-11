@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/math.dart';
 
 class ResizableBox extends StatefulWidget {
   const ResizableBox({Key? key}) : super(key: key);
@@ -15,28 +16,45 @@ class ResizableBoxState extends State<ResizableBox> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onPanUpdate: (details) {
-        setState(() {
-          _width += details.delta.dx;
-          _height += details.delta.dy;
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final maxWidth = constraints.maxWidth;
+        final maxHeight = constraints.maxHeight;
 
-          // Limit width and height
-          if (_width < 100) {
-            _width = 100;
-          }
-          if (_height < 100) {
-            _height = 100;
-          }
-        });
+        return GestureDetector(
+          onPanUpdate: (details) {
+            setState(() {
+              final renderBox = context.findRenderObject() as RenderBox;
+              final local = renderBox.globalToLocal(details.globalPosition);
+              _width += details.delta.dx * sign(local.dx - _width * 0.5) * 2;
+              _height += details.delta.dy * sign(local.dy - _height * 0.5) * 2;
+
+              // Limit min
+              if (_width < 50) {
+                _width = 50;
+              }
+              if (_height < 50) {
+                _height = 50;
+              }
+
+              // Limit max
+              if (_width > maxWidth) {
+                _width = maxWidth;
+              }
+              if (_height > maxHeight) {
+                _height = maxHeight;
+              }
+            });
+          },
+          child: Container(
+            width: _width,
+            height: _height,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.blue),
+            ),
+          ),
+        );
       },
-      child: Container(
-        width: _width,
-        height: _height,
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.blue),
-        ),
-      ),
     );
   }
 }
