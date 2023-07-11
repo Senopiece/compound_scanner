@@ -11,20 +11,6 @@ import 'package:image/image.dart' as imglib;
 
 import 'package:tflite_flutter/tflite_flutter.dart';
 
-int argmax(List<dynamic> X) {
-  int idx = 0;
-  int l = X.length;
-  for (int i = 0; i < l; i++) {
-    idx = X[i] > X[idx] ? i : idx;
-  }
-  return idx;
-}
-
-Future<Uint8List> loadModelFromAsset(String asset) async {
-  ByteData rawAssetFile = await rootBundle.load('assets/models/$asset.tflite');
-  return rawAssetFile.buffer.asUint8List();
-}
-
 // TODO: forbid to run when already running
 Stream<String> imgToInchi(Uint8List imageBytes) async* {
   late List<List<double>> features;
@@ -56,6 +42,20 @@ Stream<String> imgToInchi(Uint8List imageBytes) async* {
       yield res;
     }
   }
+}
+
+int argmax(List<dynamic> X) {
+  int idx = 0;
+  int l = X.length;
+  for (int i = 0; i < l; i++) {
+    idx = X[i] > X[idx] ? i : idx;
+  }
+  return idx;
+}
+
+Future<Uint8List> loadModelFromAsset(String asset) async {
+  ByteData rawAssetFile = await rootBundle.load('assets/models/$asset.tflite');
+  return rawAssetFile.buffer.asUint8List();
 }
 
 Future<List<List<double>>> _encode(

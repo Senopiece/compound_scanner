@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:image/image.dart' as imglib;
 import 'package:image_picker/image_picker.dart';
 
+import '../services/img_to_inchi.dart';
 import '../utils/conversions.dart';
 import '../screens/analysis.dart';
 import '../widgets/fullscreen_camera.dart';
@@ -23,6 +24,7 @@ class ImagePickScreen extends StatefulWidget {
 class _ImagePickScreenState extends State<ImagePickScreen> {
   bool _flash = false;
   bool _flashBang = false;
+  bool _pauseCamera = false;
 
   // these are remaining null in case camera is active with error
   Size? _latestCameraImageSize;
@@ -85,6 +87,7 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
         children: [
           FullscreenCamera(
             flash: _flash,
+            pause: _pauseCamera,
             onCameraImageCallback: (size, scale, orientation, img) {
               final preLatestCameraImage = _latestCameraImage;
               _latestCameraImageSize = size;
@@ -166,18 +169,22 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
                     shadowColor: MaterialStateProperty.all(Colors.transparent),
                   ),
                   onPressed: () async {
-                    setState(() => _flashBang = true);
-                    await Future.delayed(const Duration(milliseconds: 30));
+                    setState(() {
+                      _pauseCamera = true;
+                      _flashBang = true;
+                    });
+                    await Future.delayed(const Duration(milliseconds: 100));
                     setState(() => _flashBang = false);
-                    await Future.delayed(const Duration(milliseconds: 40));
+                    await Future.delayed(const Duration(milliseconds: 60));
+                    final imgShot = _shotImage();
+                    await Future.delayed(const Duration(milliseconds: 1));
                     if (context.mounted) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           maintainState: false,
-                          builder: (context) => AnalysisScreen(
-                            imageBytes: _shotImage(),
-                          ),
+                          builder: (context) =>
+                              AnalysisScreen(imageBytes: imgShot),
                         ),
                       );
                     }

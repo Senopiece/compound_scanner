@@ -9,11 +9,13 @@ import 'jumping_dots.dart';
 class FullscreenCamera extends StatefulWidget {
   final void Function(Size, double, int, CameraImage) onCameraImageCallback;
   final bool flash;
+  final bool pause;
 
   const FullscreenCamera({
     Key? key,
     required this.flash,
     required this.onCameraImageCallback,
+    required this.pause,
   }) : super(key: key);
 
   @override
@@ -53,6 +55,7 @@ class _FullscreenCameraState extends State<FullscreenCamera>
             _initializeControllerFuture = null;
             _controller?.stopImageStream();
             _controller?.dispose();
+            _controller = null;
           });
         });
         break;
@@ -83,6 +86,7 @@ class _FullscreenCameraState extends State<FullscreenCamera>
   void didUpdateWidget(covariant FullscreenCamera oldWidget) {
     super.didUpdateWidget(oldWidget);
     _controller?.setFlashMode(widget.flash ? FlashMode.torch : FlashMode.off);
+    _applyPaused();
   }
 
   Future<void> _ctrlFut() async {
@@ -104,18 +108,33 @@ class _FullscreenCameraState extends State<FullscreenCamera>
       await _controller!.initialize();
       await _controller!
           .setFlashMode(widget.flash ? FlashMode.torch : FlashMode.off);
-      _controller!.startImageStream(
-        (image) {
-          if (cameraPreviewScale != null && _controller != null) {
-            widget.onCameraImageCallback(_previewSize(), cameraPreviewScale!,
-                _controller!.description.sensorOrientation, image);
-          }
-        },
-      );
+      _applyPaused();
     } catch (e) {
       _controller?.dispose();
       _controller = null;
       rethrow;
+    }
+  }
+
+  void _applyPaused() {
+    if (_controller == null) return;
+    if (widget.pause) {
+      _controller!.pausePreview();
+      if (_controller!.value.isStreamingImages) {
+        _controller!.stopImageStream();
+      }
+    } else {
+      _controller!.resumePreview();
+      if (!_controller!.value.isStreamingImages) {
+        _controller!.startImageStream(
+          (image) {
+            if (cameraPreviewScale != null && _controller != null) {
+              widget.onCameraImageCallback(_previewSize(), cameraPreviewScale!,
+                  _controller!.description.sensorOrientation, image);
+            }
+          },
+        );
+      }
     }
   }
 
