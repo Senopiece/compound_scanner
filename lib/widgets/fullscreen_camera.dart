@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
+import 'jumping_dots.dart';
+
 // TODO: blinking when camera permission is not granted (mb ImagePick problem)
 class FullscreenCamera extends StatefulWidget {
   final void Function(Size, double, int, CameraImage) onCameraImageCallback;
@@ -161,7 +163,7 @@ class _FullscreenCameraState extends State<FullscreenCamera>
             ),
           );
         } else {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: ThreeDotsLoadingIndicator());
         }
       },
     );

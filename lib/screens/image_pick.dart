@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:flutter/services.dart';
 import 'package:image/image.dart' as imglib;
 import 'package:image_picker/image_picker.dart';
 
@@ -21,6 +22,7 @@ class ImagePickScreen extends StatefulWidget {
 
 class _ImagePickScreenState extends State<ImagePickScreen> {
   bool _flash = false;
+  bool _flashBang = false;
 
   // these are remaining null in case camera is active with error
   Size? _latestCameraImageSize;
@@ -31,31 +33,48 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
   final GlobalKey<ResizableBoxState> _resizableBoxKey =
       GlobalKey<ResizableBoxState>();
 
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  Future<Uint8List?> _pickImage() async {
-    final picker = ImagePicker();
+  Future<Uint8List> _pickImage() async {
     late XFile? pickedFile;
     try {
-      pickedFile = await picker.pickImage(source: ImageSource.gallery);
+      pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
     } catch (e) {
       // TODO: handle storage permission exception and other stuff
       print(e);
-      return null;
+      rethrow;
     }
     if (pickedFile == null) {
-      return null;
+      throw "no image picked"; // TODO: test
     }
-    final res = await pickedFile.readAsBytes();
-    return res;
+    return (await pickedFile.readAsBytes());
+  }
+
+  Uint8List _shotImage() {
+    if (_latestCameraImage == null) {
+      throw "shot invoked on a null camera";
+    }
+
+    // take the last preview frame
+    final image = convertYUV420ToImage(
+      _latestCameraImage!,
+      rotation: _latestCameraOrientation!,
+    );
+
+    // crop it
+    final previewSize = _latestCameraImageSize!;
+    final s = _latestCameraImageScale!;
+
+    final selection = _resizableBoxKey.currentState!.getSize();
+
+    final cropped = imglib.copyCrop(
+      image,
+      x: (0.5 * (previewSize.width - selection.width / s)).toInt(),
+      y: (0.5 * (previewSize.height - selection.height / s)).toInt(),
+      width: selection.width ~/ s,
+      height: selection.height ~/ s,
+    );
+
+    // and return encoded png
+    return imglib.encodePng(cropped);
   }
 
   @override
@@ -75,6 +94,7 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
               if (preLatestCameraImage == null) setState(() {});
             },
           ),
+          Container(color: _flashBang ? Colors.black : null),
           ColorFiltered(
             colorFilter: const ColorFilter.mode(
               Colors.black54,
@@ -94,7 +114,20 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
                       ),
                     ],
                   ),
-          )
+          ),
+          Align(
+            alignment: Alignment.topCenter,
+            child: _latestCameraImage == null
+                ? null
+                : const Padding(
+                    padding: EdgeInsets.only(top: 100),
+                    child: Text(
+                      'Adjust the frame \n to fill with compound',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 20),
+                    ),
+                  ),
+          ),
         ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -104,97 +137,80 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                width: 60,
-                height: 60,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final pickedImageBytes = await _pickImage();
-                    if (context.mounted && pickedImageBytes != null) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          maintainState: false,
-                          builder: (context) => AnalysisScreen(
-                            imageBytes: pickedImageBytes,
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                  child: const Icon(Icons.browse_gallery),
+              _button(
+                child: Icon(
+                  _flash ? Icons.flash_off : Icons.flash_on,
+                  color: _latestCameraImage != null ? null : Colors.grey,
                 ),
+                onPressed: () {
+                  if (_latestCameraImage != null) {
+                    setState(() => _flash = !_flash);
+                  }
+                },
               ),
               const SizedBox(width: 30),
               SizedBox(
                 width: 80,
                 height: 80,
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        _latestCameraImage != null ? null : Colors.grey,
+                  style: ButtonStyle(
+                    padding: MaterialStateProperty.all<EdgeInsets>(
+                      const EdgeInsets.all(8), // Set the desired padding
+                    ),
+                    shape: MaterialStateProperty.all<OutlinedBorder>(
+                      const CircleBorder(),
+                    ),
+                    backgroundColor: MaterialStateProperty.all<Color>(
+                      Colors.white.withOpacity(0.1),
+                    ),
+                    shadowColor: MaterialStateProperty.all(Colors.transparent),
                   ),
-                  onPressed: () {
-                    if (_latestCameraImage == null) {
-                      return;
-                    }
-
-                    // take the last preview frame
-                    final image = convertYUV420ToImage(
-                      _latestCameraImage!,
-                      rotation: _latestCameraOrientation!,
-                    );
-
-                    // crop it
-                    final previewSize = _latestCameraImageSize!;
-                    final s = _latestCameraImageScale!;
-
-                    final selection = _resizableBoxKey.currentState!.getSize();
-
-                    final cropped = imglib.copyCrop(
-                      image,
-                      x: (0.5 * (previewSize.width - selection.width / s))
-                          .toInt(),
-                      y: (0.5 * (previewSize.height - selection.height / s))
-                          .toInt(),
-                      width: selection.width ~/ s,
-                      height: selection.height ~/ s,
-                    );
-
-                    // display it on a new screen.
+                  onPressed: () async {
+                    setState(() => _flashBang = true);
+                    await Future.delayed(const Duration(milliseconds: 30));
+                    setState(() => _flashBang = false);
+                    await Future.delayed(const Duration(milliseconds: 40));
                     if (context.mounted) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           maintainState: false,
                           builder: (context) => AnalysisScreen(
-                            imageBytes: imglib.encodePng(cropped),
+                            imageBytes: _shotImage(),
                           ),
                         ),
                       );
                     }
                   },
-                  child: const Icon(Icons.camera_alt),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _latestCameraImage != null
+                          ? Colors.white.withOpacity(0.9)
+                          : Colors.grey.withOpacity(0.8),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 30),
-              SizedBox(
-                width: 60,
-                height: 60,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        _latestCameraImage != null ? null : Colors.grey,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _flash = !_flash;
-                    });
-                  },
-                  child: _flash
-                      ? const Icon(Icons.flash_off)
-                      : const Icon(Icons.flash_on),
+              _button(
+                child: const Icon(
+                  Icons.image_search,
                 ),
+                onPressed: () async {
+                  final pickedImageBytes = await _pickImage();
+                  if (context.mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        maintainState: false,
+                        builder: (context) => AnalysisScreen(
+                          imageBytes: pickedImageBytes,
+                        ),
+                      ),
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -202,6 +218,27 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
             height: 40,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _button({
+    required Widget child,
+    required void Function() onPressed,
+  }) {
+    return SizedBox(
+      width: 60,
+      height: 60,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ButtonStyle(
+          shape: MaterialStateProperty.all<OutlinedBorder>(
+            const CircleBorder(),
+          ),
+          backgroundColor: MaterialStateProperty.all(Colors.transparent),
+          shadowColor: MaterialStateProperty.all(Colors.transparent),
+        ),
+        child: child,
       ),
     );
   }
