@@ -44,7 +44,7 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
       rethrow;
     }
     if (pickedFile == null) {
-      throw "no image picked"; // TODO: test
+      throw "no image picked";
     }
     return (await pickedFile.readAsBytes());
   }
@@ -81,7 +81,10 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
   @override
   void initState() {
     super.initState();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.bottom, SystemUiOverlay.top],
+    );
   }
 
   @override
@@ -234,7 +237,7 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
     );
   }
 
-  Widget _button({
+  static Widget _button({
     required Widget child,
     required void Function() onPressed,
   }) {

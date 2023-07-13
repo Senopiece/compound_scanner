@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -25,6 +26,7 @@ class AnalysisScreen extends StatefulWidget {
 }
 
 class _AnalysisScreenState extends State<AnalysisScreen> {
+  late Stream<String> _inchiStream;
   var _InChIcompleter = Completer<String>();
   var _resetKey = UniqueKey();
 
@@ -35,6 +37,31 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       SystemUiMode.manual,
       overlays: [SystemUiOverlay.bottom, SystemUiOverlay.top],
     );
+    initInchiStream();
+  }
+
+  @override
+  void didUpdateWidget(covariant AnalysisScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageBytes != widget.imageBytes) {
+      initInchiStream();
+    }
+  }
+
+  void initInchiStream() {
+    // does not work
+    // _inchiStream = imgToInchi(widget.imageBytes).asBroadcastStream();
+
+    // instead do this
+    final isController = StreamController<String>.broadcast();
+    imgToInchi(widget.imageBytes).listen(
+      (event) => isController.add(event),
+      onError: (error) => isController.addError(error),
+      onDone: () => isController.close(),
+    );
+
+    _inchiStream = isController.stream;
+    _InChIcompleter = Completer<String>();
   }
 
   @override
@@ -42,7 +69,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     super.reassemble();
     setState(() {
       _resetKey = UniqueKey();
-      _InChIcompleter = Completer<String>();
+      initInchiStream();
     });
   }
 
@@ -51,11 +78,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     return Scaffold(
       key: _resetKey,
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        centerTitle: true,
-        title: const Text("Scan Result"),
-      ),
-      backgroundColor: const Color.fromARGB(255, 50, 50, 50),
+      backgroundColor: Theme.of(context).canvasColor,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -70,9 +93,22 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   child: Image.memory(widget.imageBytes),
                 ),
               ),
-              const SizedBox(
-                height: 50,
-                child: ThreeDotsLoadingIndicator(),
+              SizedBox(
+                height: 70,
+                child: Center(
+                  child: StreamBuilder(
+                    stream: _inchiStream,
+                    builder: (context, snap) {
+                      if (snap.hasData) {
+                        final split = snap.data!.split('/');
+                        if (split.length > 1) {
+                          return _chemText(split[1]);
+                        }
+                      }
+                      return const ThreeDotsLoadingIndicator();
+                    },
+                  ),
+                ),
               ),
               Container(
                 width: double.infinity,
@@ -100,7 +136,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                     ),
                     Expanded(
                       child: StreamBuilder(
-                        stream: imgToInchi(widget.imageBytes),
+                        stream: _inchiStream,
                         builder: (context, snap) {
                           if (snap.connectionState == ConnectionState.done) {
                             if (snap.hasError) {
@@ -172,7 +208,36 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  Widget _copyButton({
+  static Widget _chemText(String text) {
+    final subs = {
+      '0': '\u2080',
+      '1': '\u2081',
+      '2': '\u2082',
+      '3': '\u2083',
+      '4': '\u2084',
+      '5': '\u2085',
+      '6': '\u2086',
+      '7': '\u2087',
+      '8': '\u2088',
+      '9': '\u2089',
+    };
+
+    // preprocess making each number subscript
+    var modifiedText = "";
+    for (var i = 0; i < text.length; i++) {
+      modifiedText += subs.keys.contains(text[i]) ? subs[text[i]]! : text[i];
+    }
+
+    return Text(
+      modifiedText,
+      style: const TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  static Widget _copyButton({
     void Function()? onPressed,
   }) {
     return Container(
