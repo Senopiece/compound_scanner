@@ -15,7 +15,7 @@ Stream<String> imgToInchi(Uint8List imageBytes) async* {
   {
     final encoder = await loadModelFromAsset('encoder');
     features = await Isolate.run(
-      () async => await _encode(encoder, imageBytes),
+      () => _encode(encoder, imageBytes),
     );
   }
 
@@ -23,7 +23,7 @@ Stream<String> imgToInchi(Uint8List imageBytes) async* {
   {
     final isg = await loadModelFromAsset('isg');
     init = await Isolate.run(
-      () async => await _isg(isg, features),
+      () => _isg(isg, features),
     );
   }
 
@@ -57,10 +57,10 @@ Future<Uint8List> loadModelFromAsset(String asset) async {
   return rawAssetFile.buffer.asUint8List();
 }
 
-Future<List<List<double>>> _encode(
+List<List<double>> _encode(
   Uint8List encoderBytes,
   Uint8List imageBytes,
-) async {
+) {
   late List<List<double>> featuresReshaped;
   final interpreter = Interpreter.fromBuffer(encoderBytes);
 
@@ -124,10 +124,10 @@ Future<List<List<double>>> _encode(
   return featuresReshaped;
 }
 
-Future<List<List<List<double>>>> _isg(
+List<List<List<double>>> _isg(
   Uint8List isgBytes,
   List<List<double>> features,
-) async {
+) {
   // get initial state
   late List<List<List<double>>> initialState;
   final interpreter = Interpreter.fromBuffer(isgBytes);
