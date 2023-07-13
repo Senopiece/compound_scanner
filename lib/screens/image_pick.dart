@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:image/image.dart' as imglib;
 import 'package:image_picker/image_picker.dart';
 
-import '../services/img_to_inchi.dart';
 import '../utils/conversions.dart';
 import '../screens/analysis.dart';
 import '../widgets/fullscreen_camera.dart';
@@ -77,6 +76,12 @@ class _ImagePickScreenState extends State<ImagePickScreen> {
 
     // and return encoded png
     return imglib.encodePng(cropped);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
   }
 
   @override

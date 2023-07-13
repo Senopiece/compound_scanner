@@ -1,9 +1,7 @@
 import 'dart:isolate';
 import 'dart:async';
 import 'dart:typed_data';
-import 'dart:ui';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../utils/token_map.dart' as token_map;
@@ -21,7 +19,7 @@ Stream<String> imgToInchi(Uint8List imageBytes) async* {
     );
   }
 
-  late List<List<double>> init;
+  late List<List<List<double>>> init;
   {
     final isg = await loadModelFromAsset('isg');
     init = await Isolate.run(
@@ -38,6 +36,7 @@ Stream<String> imgToInchi(Uint8List imageBytes) async* {
       [decoder, init, features, receivePort.sendPort],
     );
     await for (var symbol in receivePort) {
+      if (symbol == "<END>") break;
       res += symbol;
       yield res;
     }
@@ -66,13 +65,13 @@ Future<List<List<double>>> _encode(
   final interpreter = Interpreter.fromBuffer(encoderBytes);
 
   final input = interpreter.getInputTensor(0);
-  final inputW = input.shape[1];
-  final inputH = input.shape[2];
+  final inputW = input.shape[2];
+  final inputH = input.shape[1];
   final inputDepth = input.shape[3];
 
   final image = imglib.decodeImage(imageBytes);
 
-  // TODO: resize by filling gaps
+  // TODO: make the input image have the same aspect ratio as the input tensor, then resize the image
   final resizedImage = imglib.copyResize(
     image!,
     width: inputW,
@@ -86,18 +85,30 @@ Future<List<List<double>>> _encode(
     ),
   );
 
-  // Normalize the image pixel values and convert them to a Float32List
-  // int pixelIndex = 0;
+  // grayscale
+  var colorSum = 0;
   for (var y = 0; y < inputH; y++) {
     for (var x = 0; x < inputW; x++) {
       final pixel = resizedImage.getPixel(x, y);
-      inputImage[y][x][0] = pixel.r.toInt();
-      inputImage[y][x][1] = pixel.g.toInt();
-      inputImage[y][x][2] = pixel.b.toInt();
+      var color = (0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b).toInt();
+      inputImage[x][y][0] = color;
+      inputImage[x][y][1] = color;
+      inputImage[x][y][2] = color;
+      colorSum += color;
     }
   }
 
-  // input.data = inputImage.buffer.asUint8List();
+  // inverse image if needed
+  if (colorSum / (inputW * inputH) >= 128) {
+    for (var y = 0; y < inputH; y++) {
+      for (var x = 0; x < inputW; x++) {
+        var color = 255 - inputImage[x][y][0];
+        inputImage[x][y][0] = color;
+        inputImage[x][y][1] = color;
+        inputImage[x][y][2] = color;
+      }
+    }
+  }
 
   final outputTensor = interpreter.getOutputTensor(0);
   var output = [
@@ -113,70 +124,68 @@ Future<List<List<double>>> _encode(
   return featuresReshaped;
 }
 
-Future<List<List<double>>> _isg(
+Future<List<List<List<double>>>> _isg(
   Uint8List isgBytes,
   List<List<double>> features,
 ) async {
   // get initial state
-  late List<double> hiddenState, memoryState;
+  late List<List<List<double>>> initialState;
   final interpreter = Interpreter.fromBuffer(isgBytes);
 
+  final outputTensors = interpreter.getOutputTensors();
+
   final outputs = {
-    0: [List<double>.filled(1024, 0)], // hidden
-    1: [List<double>.filled(1024, 0)] // memory
+    0: [
+      [List<double>.filled(outputTensors[0].shape[2], 0)],
+      [List<double>.filled(outputTensors[0].shape[2], 0)]
+    ],
   };
   interpreter.runForMultipleInputs([
     [features]
   ], outputs);
-  hiddenState = outputs[0]![0];
-  memoryState = outputs[1]![0];
+  initialState = outputs[0]!;
 
-  return [hiddenState, memoryState];
+  return initialState;
 }
 
+// TODO: catch and forward exceptions
 void _decode(List<dynamic> args) {
   final Uint8List decodeBytes = args[0];
-  final List<List<double>> init = args[1];
+  final List<List<List<double>>> initialState = args[1];
   final List<List<double>> features = args[2];
   final SendPort sendPort = args[3];
 
   final interpreter = Interpreter.fromBuffer(decodeBytes);
 
-  // final encoderMean = features.reduce((a, b) => a + b) / features.length;
-
   var tokenProbabilities = List<double>.filled(197, 0);
-  var hidden = init[0];
-  var memory = init[1];
   var prevPred = 1;
+  var state = initialState;
   for (var i = 0; i < 30; i++) {
+    // TODO: set 300 iterations for production
     final outputs = {
-      1: [tokenProbabilities], // token probabilities
-      0: [List<double>.filled(1024, 0)], // hidden
-      2: [List<double>.filled(1024, 0)], // memory
+      1: [tokenProbabilities],
+      0: state,
     };
 
     interpreter.runForMultipleInputs(
       [
+        state,
+        [features], // image features
         [
           [prevPred]
-        ],
-        [features], // image features
-        [memory], // hidden
-        [hidden], // memory
+        ]
       ],
       outputs,
     );
 
-    memory = outputs[2]![0];
-    hidden = outputs[0]![0];
-    tokenProbabilities = outputs[1]![0];
+    state = outputs[0] as List<List<List<double>>>;
+    tokenProbabilities = outputs[1]![0] as List<double>;
 
     prevPred = argmax(tokenProbabilities);
     final symbol = token_map.map[prevPred];
-    debugPrint(symbol);
     if (symbol == "<END>") break;
     sendPort.send(symbol);
   }
-
+  sendPort.send("<END>");
   interpreter.close();
 }
