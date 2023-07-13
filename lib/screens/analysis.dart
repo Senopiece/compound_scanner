@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'dart:typed_data';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:image/image.dart' as imglib;
 
 import '../services/img_to_inchi.dart';
+import '../services/img_to_smiles.dart';
 import '../widgets/jumping_dots.dart';
 
 class NoOverscrollIndicator extends ScrollBehavior {
@@ -90,7 +90,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 width: double.infinity,
                 child: FittedBox(
                   fit: BoxFit.contain,
-                  child: Image.memory(widget.imageBytes),
+                  child: Image.memory(
+                    imglib.encodePng(decodeImage(widget.imageBytes)),
+                  ),
                 ),
               ),
               SizedBox(
