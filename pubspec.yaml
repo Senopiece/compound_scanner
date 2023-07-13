@@ -16,6 +16,7 @@ dependencies:
   firebase_core: ^2.14.0
   firebase_crashlytics: ^3.3.3
   tflite_flutter: ^0.10.1
+  fluttertoast: ^8.2.2
   # tflite_flutter_helper_plus: ^0.0.2
   
 dev_dependencies:
