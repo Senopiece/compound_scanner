@@ -76,7 +76,9 @@ class _FullscreenCameraState extends State<FullscreenCamera>
 
   @override
   void dispose() {
-    _controller?.stopImageStream();
+    if (_controller != null && _controller!.value.isStreamingImages) {
+      _controller?.stopImageStream();
+    }
     _controller?.dispose();
     super.dispose();
     WidgetsBinding.instance.removeObserver(this);
