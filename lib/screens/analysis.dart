@@ -6,6 +6,7 @@ import 'package:image/image.dart' as imglib;
 
 import '../services/img_to_inchi.dart';
 import '../services/img_to_smiles.dart';
+import '../widgets/blinker.dart';
 import '../widgets/jumping_dots.dart';
 
 class NoOverscrollIndicator extends ScrollBehavior {
@@ -28,6 +29,7 @@ class AnalysisScreen extends StatefulWidget {
 class _AnalysisScreenState extends State<AnalysisScreen> {
   late Stream<String> _inchiStream;
   var _InChIcompleter = Completer<String>();
+  late Future<Uint8List> _PreprocessedImageFut;
   var _resetKey = UniqueKey();
 
   @override
@@ -62,6 +64,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
     _inchiStream = isController.stream;
     _InChIcompleter = Completer<String>();
+    _PreprocessedImageFut = preprocess(widget.imageBytes);
   }
 
   @override
@@ -88,28 +91,53 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 color: const Color.fromARGB(255, 23, 23, 23),
                 height: 300,
                 width: double.infinity,
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: Image.memory(
-                    imglib.encodePng(decodeImage(widget.imageBytes)),
-                  ),
+                child: FutureBuilder(
+                  future: _PreprocessedImageFut,
+                  builder: (context, snap) {
+                    if (snap.hasData) {
+                      return FittedBox(
+                        fit: BoxFit.contain,
+                        child: Image.memory(
+                          snap.data!,
+                        ),
+                      );
+                    } else if (snap.hasError) {
+                      return const Center(
+                        child: Text("Error"),
+                      ); // TODO: beautify
+                    } else {
+                      return const Center(child: ThreeDotsLoadingIndicator());
+                    }
+                  },
                 ),
               ),
               SizedBox(
                 height: 70,
-                child: Center(
-                  child: StreamBuilder(
-                    stream: _inchiStream,
-                    builder: (context, snap) {
-                      if (snap.hasData) {
-                        final split = snap.data!.split('/');
-                        if (split.length > 1) {
-                          return _chemText(split[1]);
-                        }
+                child: StreamBuilder(
+                  stream: _inchiStream,
+                  builder: (context, snap) {
+                    final children = <Widget>[];
+                    bool done = false;
+                    if (snap.hasData) {
+                      final split = snap.data!.split('/');
+                      done = split.length > 2 ||
+                          snap.connectionState == ConnectionState.done;
+                      if (split.length > 1) {
+                        children.add(_chemText(split[1]));
                       }
-                      return const ThreeDotsLoadingIndicator();
-                    },
-                  ),
+                    }
+                    if (!done) {
+                      children.add(const BlinkingCursor(
+                        cursorHeight: 24,
+                        cursorWidth: 2.5,
+                      ));
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: children,
+                    );
+                  },
                 ),
               ),
               Container(
@@ -162,20 +190,32 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                                 scrollDirection: Axis.horizontal,
                                 child: SizedBox(
                                   height: double.infinity,
-                                  child: Center(
-                                    child: Text(
-                                      snap.data!,
-                                      maxLines: 1,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        snap.data!,
+                                        maxLines: 1,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
-                                    ),
+                                      snap.connectionState !=
+                                              ConnectionState.done
+                                          ? const BlinkingCursor()
+                                          : const SizedBox(),
+                                    ],
                                   ),
                                 ),
                               ),
                             );
                           } else {
-                            return const ThreeDotsLoadingIndicator();
+                            return const Row(
+                              children: [
+                                BlinkingCursor(),
+                              ],
+                            );
                           }
                         },
                       ),
@@ -232,6 +272,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
     return Text(
       modifiedText,
+      textAlign: TextAlign.center,
       style: const TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w500,

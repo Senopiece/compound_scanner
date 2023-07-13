@@ -83,10 +83,10 @@ imglib.Image deleteEmptyBorders(imglib.Image image) {
   }
 
   // crop = image[rows.min() : rows.max() + 1, cols.min() : cols.max() + 1]
-  final minRow = rows.reduce(min);
-  final maxRow = rows.reduce(max);
-  final minCol = cols.reduce(min);
-  final maxCol = cols.reduce(max);
+  final minRow = rows.isEmpty ? 0 : rows.reduce(min);
+  final maxRow = rows.isEmpty ? image.height : rows.reduce(max);
+  final minCol = cols.isEmpty ? 0 : cols.reduce(min);
+  final maxCol = cols.isEmpty ? image.width : cols.reduce(max);
   final crop = imglib.copyCrop(
     image,
     x: minRow,
