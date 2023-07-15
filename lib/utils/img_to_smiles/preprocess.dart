@@ -1,6 +1,6 @@
 part of '../../services/img_to_smiles.dart';
 
-imglib.Image resizeByRatio(imglib.Image image) {
+imglib.Image _resizeByRatio(imglib.Image image) {
   const maxwidth = 512;
   final ratio = maxwidth / max(image.width, image.height);
   final newWidth = (image.width * ratio).toInt();
@@ -15,7 +15,7 @@ imglib.Image resizeByRatio(imglib.Image image) {
   return resizedImage;
 }
 
-imglib.Image centralSquareImage(imglib.Image image) {
+imglib.Image _centralSquareImage(imglib.Image image) {
   var maxWh = (1.2 * max(image.width, image.height)).toInt();
 
   if (maxWh < 512) {
@@ -40,65 +40,7 @@ imglib.Image centralSquareImage(imglib.Image image) {
   return newIm;
 }
 
-imglib.Image deleteEmptyBorders(imglib.Image image) {
-  // final grayscale = imglib.grayscale(image); // assuming grayscale input
-
-  // mask = image > 200
-  const mask_th = 200;
-
-  // rows = np.flatnonzero((~mask).sum(axis=1))
-  final rows = <int>[];
-  for (var y = 0; y < image.height; y++) {
-    var sum = 0;
-
-    for (var x = 0; x < image.width; x++) {
-      final pixel = image.getPixel(x, y);
-
-      if (pixel.r > mask_th) {
-        sum++;
-      }
-    }
-
-    if (sum > 0) {
-      rows.add(y);
-    }
-  }
-
-  // cols = np.flatnonzero((~mask).sum(axis=0))
-  final cols = <int>[];
-  for (var x = 0; x < image.width; x++) {
-    var sum = 0;
-
-    for (var y = 0; y < image.height; y++) {
-      final pixel = image.getPixel(x, y);
-
-      if (pixel.r > mask_th) {
-        sum++;
-      }
-    }
-
-    if (sum > 0) {
-      cols.add(x);
-    }
-  }
-
-  // crop = image[rows.min() : rows.max() + 1, cols.min() : cols.max() + 1]
-  final minRow = rows.isEmpty ? 0 : rows.reduce(min);
-  final maxRow = rows.isEmpty ? image.height : rows.reduce(max);
-  final minCol = cols.isEmpty ? 0 : cols.reduce(min);
-  final maxCol = cols.isEmpty ? image.width : cols.reduce(max);
-  final crop = imglib.copyCrop(
-    image,
-    x: minRow,
-    y: minCol,
-    // TODO: +1?
-    width: maxCol - minCol,
-    height: maxRow - minRow,
-  );
-  return crop;
-}
-
-imglib.Image removeTransparent(Uint8List imageBytes) {
+imglib.Image _removeTransparent(Uint8List imageBytes) {
   final src = imglib.decodeImage(imageBytes);
 
   if (src == null) {
@@ -116,35 +58,14 @@ imglib.Image removeTransparent(Uint8List imageBytes) {
   return dst;
 }
 
-imglib.Image getBNWImage(imglib.Image image) {
-  return imglib.adjustColor(
+imglib.Image _getBNWImage(imglib.Image image) {
+  return imglib.contrast(
     imglib.grayscale(image),
-    contrast: 1.8,
+    contrast: 180,
   );
 }
 
-imglib.Image increaseContrast(imglib.Image image) {
-  final minmax = imglib.minMax(image);
-  final min = minmax[0];
-  final max = minmax[1];
-  final range = max - min;
-
-  for (var y = 0; y < image.height; y++) {
-    for (var x = 0; x < image.width; x++) {
-      final pixel = image.getPixel(x, y);
-
-      final newRed = ((pixel.r - min) / range * 255).round().clamp(0, 255);
-      final newGreen = ((pixel.g - min) / range * 255).round().clamp(0, 255);
-      final newBlue = ((pixel.b - min) / range * 255).round().clamp(0, 255);
-
-      image.setPixelRgb(x, y, newRed, newGreen, newBlue);
-    }
-  }
-
-  return image;
-}
-
-imglib.Image getResize(imglib.Image image) {
+imglib.Image _getResize(imglib.Image image) {
   final width = image.width;
   final height = image.height;
 
@@ -160,32 +81,53 @@ imglib.Image getResize(imglib.Image image) {
   } else if (width >= 512 || height >= 512) {
     return image;
   } else {
-    return resizeByRatio(image);
+    return _resizeByRatio(image);
   }
 }
 
-imglib.Image increaseBrightness(imglib.Image image) {
-  return imglib.adjustColor(image, brightness: 1.6);
+List<List<List<double>>> _efnPreprocessInput(imglib.Image image) {
+  const mean = [0.485, 0.456, 0.406];
+  const std = [0.229, 0.224, 0.225];
+
+  final res = List.generate(
+    512,
+    (index) => List.generate(
+      512,
+      (index) => List<double>.filled(3, 0),
+    ),
+  );
+
+  for (var y = 0; y < image.height; y++) {
+    for (var x = 0; x < image.width; x++) {
+      final p = image.getPixel(x, y);
+      final colorNorm = p.r / 255;
+      res[x][y] = List.generate(3, (i) => (colorNorm - mean[i]) / std[i]);
+    }
+  }
+
+  return res;
 }
 
-imglib.Image decodeImage(Uint8List imageBytes) {
+imglib.Image _decodeImage(Uint8List imageBytes) {
   // In contrast with the original,
   // I reorganized the pipeline as follows
   // because we have no need to accumulate in memory images for all the passed stages
   // (optimization purpose)
   final List<dynamic> stages = [
-    removeTransparent,
-    increaseContrast,
-    getBNWImage,
-    getResize,
-    deleteEmptyBorders,
-    centralSquareImage,
-    increaseBrightness,
-    // TODO: now have no impl for efn.preprocess_input(img)
+    _removeTransparent,
+    _getBNWImage,
+    _getResize,
+    _centralSquareImage,
+    (img) => imglib.copyResize(
+          img,
+          width: 512,
+          height: 512,
+          interpolation: imglib.Interpolation.cubic,
+        ),
   ];
   dynamic tmp = imageBytes;
   for (var stage in stages) {
-    print(stage);
+    debugPrint('$stage');
     tmp = stage(tmp);
   }
   return tmp;

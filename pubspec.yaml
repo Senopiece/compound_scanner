@@ -15,8 +15,9 @@ dependencies:
   pytorch_lite: ^2.0.5
   firebase_core: ^2.14.0
   firebase_crashlytics: ^3.3.3
-  tflite_flutter: ^0.10.1
+  # tflite_flutter: ^0.10.1
   fluttertoast: ^8.2.2
+  dio: ^5.2.1+1
   # tflite_flutter_helper_plus: ^0.0.2
   
 dev_dependencies:
@@ -36,7 +37,9 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
 
-  assets:
-    - assets/models/encoder.tflite
-    - assets/models/decoder.tflite
-    - assets/models/isg.tflite
+  # assets:
+  #   # - assets/models/encoder.tflite
+  #   # - assets/models/decoder.tflite
+  #   # - assets/models/isg.tflite
+  #   - assets/models/decimer.tflite
+  #   # - assets/models/transformer_decimer.tflite

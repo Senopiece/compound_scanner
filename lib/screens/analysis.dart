@@ -1,21 +1,16 @@
 import 'dart:async';
+import 'package:compound_scanner/utils/fake.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image/image.dart' as imglib;
 
-import '../services/img_to_inchi.dart';
+// import '../services/img_to_inchi.dart';
 import '../services/img_to_smiles.dart';
+import '../services/smiles_to_all.dart';
 import '../widgets/blinker.dart';
 import '../widgets/jumping_dots.dart';
-
-class NoOverscrollIndicator extends ScrollBehavior {
-  @override
-  Widget buildOverscrollIndicator(
-      BuildContext context, Widget child, ScrollableDetails details) {
-    return child;
-  }
-}
+import '../widgets/slot.dart';
 
 class AnalysisScreen extends StatefulWidget {
   final Uint8List imageBytes;
@@ -27,10 +22,14 @@ class AnalysisScreen extends StatefulWidget {
 }
 
 class _AnalysisScreenState extends State<AnalysisScreen> {
+  late Stream<String> _smilesStream;
   late Stream<String> _inchiStream;
-  var _InChIcompleter = Completer<String>();
-  late Future<Uint8List> _PreprocessedImageFut;
+  late Stream<String> _iupakStream;
+
   var _resetKey = UniqueKey();
+
+  List<Widget> _presentationsList = [];
+  int _presentationsListIndex = 0; // currently displaying
 
   @override
   void initState() {
@@ -39,32 +38,132 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       SystemUiMode.manual,
       overlays: [SystemUiOverlay.bottom, SystemUiOverlay.top],
     );
-    initInchiStream();
+    initSmilesStream();
   }
 
   @override
   void didUpdateWidget(covariant AnalysisScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.imageBytes != widget.imageBytes) {
-      initInchiStream();
+      initSmilesStream();
     }
   }
 
-  void initInchiStream() {
-    // does not work
-    // _inchiStream = imgToInchi(widget.imageBytes).asBroadcastStream();
+  void initSmilesStream() {
+    final smilesStreamController = StreamController<String>.broadcast();
+    final inchiStreamController = StreamController<String>.broadcast();
+    final iupakStreamController = StreamController<String>.broadcast();
 
-    // instead do this
-    final isController = StreamController<String>.broadcast();
-    imgToInchi(widget.imageBytes).listen(
-      (event) => isController.add(event),
-      onError: (error) => isController.addError(error),
-      onDone: () => isController.close(),
-    );
+    _smilesStream = smilesStreamController.stream;
+    _inchiStream = inchiStreamController.stream;
+    _iupakStream = iupakStreamController.stream;
 
-    _inchiStream = isController.stream;
-    _InChIcompleter = Completer<String>();
-    _PreprocessedImageFut = preprocess(widget.imageBytes);
+    _presentationsList = [];
+    _presentationsList.add(
+      FittedBox(
+        fit: BoxFit.contain,
+        child: Image.memory(widget.imageBytes),
+      ),
+    ); // raw image from camera
+    _presentationsList.add(
+      const Center(child: ThreeDotsLoadingIndicator()),
+    ); // preprocessed image
+    _presentationsList.add(
+      const Center(child: ThreeDotsLoadingIndicator()),
+    ); // detected compound formula
+
+    List<void Function(Object, StackTrace?)> errorHandles = [
+      (e, _) => inchiStreamController.addError(e),
+      (e, _) => iupakStreamController.addError(e),
+      (_, _1) => setState(
+            () {
+              _presentationsList[2] = const Center(
+                child: Text("Error"),
+              );
+            },
+          ),
+      (e, _) => smilesStreamController.addError(e),
+      (_, _1) => setState(
+            () {
+              _presentationsList[1] = const Center(
+                child: Text("Error"),
+              );
+            },
+          ),
+    ];
+
+    void errorHandle(Object error, StackTrace? trace) {
+      for (var handler in errorHandles) {
+        handler(error, trace);
+      }
+    }
+
+    () async {
+      final converter = RestfulDecimerImageToSmiles(
+        'http://192.168.0.201:6969/v1/models/decimer:predict',
+      );
+
+      // preprocess image
+      late final imglib.Image preprocessedImg;
+      try {
+        preprocessedImg = await converter.preprocess(widget.imageBytes);
+      } catch (e) {
+        errorHandle(e, null);
+        return;
+      }
+
+      setState(() {
+        _presentationsList[1] = FittedBox(
+          fit: BoxFit.contain,
+          child: Image.memory(imglib.encodePng(preprocessedImg)),
+        );
+      });
+      errorHandles.removeAt(4);
+
+      // analyze
+      converter.convert(preprocessedImg).listen(
+        (event) {
+          smilesStreamController.add(event);
+        },
+        onError: (error, trace) {
+          errorHandle(error, trace);
+        },
+        onDone: () {
+          smilesStreamController.close();
+        },
+      );
+
+      final smiles = await smilesStreamController.stream.last;
+      errorHandles.removeAt(3);
+
+      // convert to other formats
+      late All all;
+      try {
+        all = await smilesToAll(smiles);
+      } catch (e) {
+        errorHandle(e, null);
+        return;
+      }
+
+      setState(() {
+        _presentationsList[2] = FittedBox(
+          fit: BoxFit.contain,
+          child: Image.memory(all.image),
+        );
+      });
+
+      fakeStream(all.inchi).listen(
+        inchiStreamController.add,
+        onError: inchiStreamController.addError,
+        onDone: inchiStreamController.close,
+      );
+
+      fakeStream(all.iupac).listen(
+        iupakStreamController.add,
+        onError: iupakStreamController.addError,
+        onDone: iupakStreamController.close,
+      );
+    }();
   }
 
   @override
@@ -72,7 +171,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     super.reassemble();
     setState(() {
       _resetKey = UniqueKey();
-      initInchiStream();
+      initSmilesStream();
     });
   }
 
@@ -91,25 +190,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 color: const Color.fromARGB(255, 23, 23, 23),
                 height: 300,
                 width: double.infinity,
-                child: FutureBuilder(
-                  future: _PreprocessedImageFut,
-                  builder: (context, snap) {
-                    if (snap.hasData) {
-                      return FittedBox(
-                        fit: BoxFit.contain,
-                        child: Image.memory(
-                          snap.data!,
-                        ),
-                      );
-                    } else if (snap.hasError) {
-                      return const Center(
-                        child: Text("Error"),
-                      ); // TODO: beautify
-                    } else {
-                      return const Center(child: ThreeDotsLoadingIndicator());
-                    }
-                  },
-                ),
+                child: _presentationsList.elementAt(_presentationsListIndex),
               ),
               SizedBox(
                 height: 70,
@@ -140,112 +221,36 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                   },
                 ),
               ),
-              Container(
-                width: double.infinity,
-                height: 50,
-                margin: const EdgeInsets.all(8.0),
-                clipBehavior: Clip.hardEdge,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.all(8),
-                      color: Colors.grey.shade400,
-                      padding: const EdgeInsets.all(3),
-                      child: Text(
-                        "InChI",
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          color: Theme.of(context).cardColor,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: StreamBuilder(
-                        stream: _inchiStream,
-                        builder: (context, snap) {
-                          if (snap.connectionState == ConnectionState.done) {
-                            if (snap.hasError) {
-                              _InChIcompleter.completeError(
-                                snap.error!,
-                                snap.stackTrace,
-                              );
-                            } else {
-                              _InChIcompleter.complete(snap.data);
-                            }
-                          }
-
-                          if (snap.hasError) {
-                            debugPrint('${snap.error}');
-                            debugPrintStack(stackTrace: snap.stackTrace);
-                            return const Text("Error");
-                          } else if (snap.hasData) {
-                            return ScrollConfiguration(
-                              behavior: NoOverscrollIndicator(),
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: SizedBox(
-                                  height: double.infinity,
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        snap.data!,
-                                        maxLines: 1,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      snap.connectionState !=
-                                              ConnectionState.done
-                                          ? const BlinkingCursor()
-                                          : const SizedBox(),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          } else {
-                            return const Row(
-                              children: [
-                                BlinkingCursor(),
-                              ],
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                    FutureBuilder(
-                      future: _InChIcompleter.future,
-                      builder: (context, snap) {
-                        return _copyButton(
-                          onPressed: snap.hasData
-                              ? () async {
-                                  await Clipboard.setData(
-                                      ClipboardData(text: snap.data!));
-                                  await Fluttertoast.cancel();
-                                  Fluttertoast.showToast(
-                                    msg: 'Text copied to clipboard',
-                                    toastLength: Toast.LENGTH_SHORT,
-                                    gravity: ToastGravity.BOTTOM,
-                                    timeInSecForIosWeb: 1,
-                                  );
-                                }
-                              : null,
-                        );
-                      },
-                    )
-                  ],
-                ),
+              Slot(
+                label: "SMILES",
+                stream: _smilesStream,
+              ),
+              Slot(
+                label: "InChI",
+                stream: _inchiStream,
+              ),
+              Slot(
+                label: "IUPAK",
+                stream: _iupakStream,
               ),
             ],
           ),
         ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.miniEndTop,
+      floatingActionButton: Column(
+        children: [
+          const SizedBox(height: 10),
+          _button(
+            child: const Icon(Icons.flip_camera_android),
+            onPressed: () {
+              setState(() {
+                _presentationsListIndex += 1;
+                _presentationsListIndex %= _presentationsList.length;
+              });
+            },
+          ),
+        ],
       ),
     );
   }
@@ -280,28 +285,24 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  static Widget _copyButton({
-    void Function()? onPressed,
+  static Widget _button({
+    required Widget child,
+    required void Function() onPressed,
   }) {
-    return Container(
+    return SizedBox(
       width: 50,
       height: 50,
-      padding: const EdgeInsets.fromLTRB(0, 4, 4, 4),
       child: ElevatedButton(
         onPressed: onPressed,
         style: ButtonStyle(
-          shape: MaterialStateProperty.all<RoundedRectangleBorder>(
-            RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+          shape: MaterialStateProperty.all<OutlinedBorder>(
+            const CircleBorder(),
           ),
-          backgroundColor: MaterialStateProperty.all(Colors.transparent),
-          shadowColor: MaterialStateProperty.all(Colors.transparent),
+          backgroundColor: MaterialStateProperty.all(
+            const Color.fromARGB(255, 23, 23, 23),
+          ),
         ),
-        child: Transform.translate(
-          offset: const Offset(-2, 0),
-          child: const Icon(Icons.copy),
-        ),
+        child: child,
       ),
     );
   }

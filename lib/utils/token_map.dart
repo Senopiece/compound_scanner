@@ -1,3 +1,5 @@
+// TODO: mv as part of img_to_inchi
+
 const map = [
   '<PAD>',
   'InChI=1S/',
