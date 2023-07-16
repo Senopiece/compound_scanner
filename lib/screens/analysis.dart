@@ -59,7 +59,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
     // async apply converter
     final converter = RestfulDecimerServerAnalyzer(
-      'http://192.168.0.201:4269/convert',
+      'https://999e-188-130-155-159.ngrok-free.app/convert',
     );
     final asyncRes = converter.analyze(widget.imageBytes);
     asyncRes.structuralImage.then(

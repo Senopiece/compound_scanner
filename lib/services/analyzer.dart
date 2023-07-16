@@ -48,15 +48,30 @@ class RestfulDecimerServerAnalyzer implements Analyzer {
 
     () async {
       try {
-        final resp = await _dio.post(
-          baseUrl,
-          data: {"image": base64.encode(img)},
-          options: Options(
-            headers: {
-              "content-type": "application/json",
-            },
-          ),
-        );
+        String reqUrl = baseUrl;
+        Response resp;
+        while (true) {
+          resp = await _dio.get(
+            reqUrl,
+            data: {"image": base64.encode(img)},
+            options: Options(
+              followRedirects: false,
+              validateStatus: (status) {
+                return status! < 500;
+              },
+              headers: {
+                "content-type": "application/json",
+                "ngrok-skip-browser-warning": "69420",
+              },
+            ),
+          );
+
+          if (resp.statusCode == 303) {
+            reqUrl = resp.headers['location']![0];
+          } else {
+            break;
+          }
+        }
 
         final res = resp.data as Map<String, dynamic>;
         structuralImageFController.complete(base64.decode(res['image']!));
