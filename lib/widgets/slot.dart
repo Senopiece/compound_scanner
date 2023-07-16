@@ -40,7 +40,6 @@ class Slot extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 60,
                 height: 25,
                 margin: const EdgeInsets.all(8),
                 color: Colors.grey.shade400,
