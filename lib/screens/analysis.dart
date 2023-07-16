@@ -1,13 +1,8 @@
 import 'dart:async';
-import 'package:compound_scanner/utils/fake.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:fluttertoast/fluttertoast.dart';
-import 'package:image/image.dart' as imglib;
 
-// import '../services/img_to_inchi.dart';
-import '../services/img_to_smiles.dart';
-import '../services/smiles_to_all.dart';
+import '../services/analyzer.dart';
 import '../widgets/blinker.dart';
 import '../widgets/jumping_dots.dart';
 import '../widgets/slot.dart';
@@ -24,11 +19,11 @@ class AnalysisScreen extends StatefulWidget {
 class _AnalysisScreenState extends State<AnalysisScreen> {
   late Stream<String> _smilesStream;
   late Stream<String> _inchiStream;
-  late Stream<String> _iupakStream;
+  late Stream<String> _iupacStream;
 
   var _resetKey = UniqueKey();
 
-  List<Widget> _presentationsList = [];
+  final List<Widget> _presentationsList = [];
   int _presentationsListIndex = 0; // currently displaying
 
   @override
@@ -50,15 +45,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   }
 
   void initSmilesStream() {
-    final smilesStreamController = StreamController<String>.broadcast();
-    final inchiStreamController = StreamController<String>.broadcast();
-    final iupakStreamController = StreamController<String>.broadcast();
-
-    _smilesStream = smilesStreamController.stream;
-    _inchiStream = inchiStreamController.stream;
-    _iupakStream = iupakStreamController.stream;
-
-    _presentationsList = [];
+    // change presentation list
+    _presentationsList.clear();
     _presentationsList.add(
       FittedBox(
         fit: BoxFit.contain,
@@ -67,103 +55,37 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     ); // raw image from camera
     _presentationsList.add(
       const Center(child: ThreeDotsLoadingIndicator()),
-    ); // preprocessed image
-    _presentationsList.add(
-      const Center(child: ThreeDotsLoadingIndicator()),
     ); // detected compound formula
 
-    List<void Function(Object, StackTrace?)> errorHandles = [
-      (e, _) => inchiStreamController.addError(e),
-      (e, _) => iupakStreamController.addError(e),
-      (_, _1) => setState(
-            () {
-              _presentationsList[2] = const Center(
-                child: Text("Error"),
-              );
-            },
-          ),
-      (e, _) => smilesStreamController.addError(e),
-      (_, _1) => setState(
-            () {
-              _presentationsList[1] = const Center(
-                child: Text("Error"),
-              );
-            },
-          ),
-    ];
-
-    void errorHandle(Object error, StackTrace? trace) {
-      for (var handler in errorHandles) {
-        handler(error, trace);
-      }
-    }
-
-    () async {
-      final converter = RestfulDecimerImageToSmiles(
-        'http://192.168.0.201:6969/v1/models/decimer:predict',
-      );
-
-      // preprocess image
-      late final imglib.Image preprocessedImg;
-      try {
-        preprocessedImg = await converter.preprocess(widget.imageBytes);
-      } catch (e) {
-        errorHandle(e, null);
-        return;
-      }
-
-      setState(() {
-        _presentationsList[1] = FittedBox(
-          fit: BoxFit.contain,
-          child: Image.memory(imglib.encodePng(preprocessedImg)),
+    // async apply converter
+    final converter = RestfulDecimerServerAnalyzer(
+      'http://192.168.0.201:4269/convert',
+    );
+    final asyncRes = converter.analyze(widget.imageBytes);
+    asyncRes.structuralImage.then(
+      (img) {
+        setState(
+          () {
+            _presentationsList[1] = FittedBox(
+              fit: BoxFit.contain,
+              child: Image.memory(img),
+            );
+          },
         );
-      });
-      errorHandles.removeAt(4);
-
-      // analyze
-      converter.convert(preprocessedImg).listen(
-        (event) {
-          smilesStreamController.add(event);
-        },
-        onError: (error, trace) {
-          errorHandle(error, trace);
-        },
-        onDone: () {
-          smilesStreamController.close();
-        },
-      );
-
-      final smiles = await smilesStreamController.stream.last;
-      errorHandles.removeAt(3);
-
-      // convert to other formats
-      late All all;
-      try {
-        all = await smilesToAll(smiles);
-      } catch (e) {
-        errorHandle(e, null);
-        return;
-      }
-
-      setState(() {
-        _presentationsList[2] = FittedBox(
-          fit: BoxFit.contain,
-          child: Image.memory(all.image),
+      },
+      onError: (_) {
+        setState(
+          () {
+            _presentationsList[1] = const Center(
+              child: Text("Error"),
+            );
+          },
         );
-      });
-
-      fakeStream(all.inchi).listen(
-        inchiStreamController.add,
-        onError: inchiStreamController.addError,
-        onDone: inchiStreamController.close,
-      );
-
-      fakeStream(all.iupac).listen(
-        iupakStreamController.add,
-        onError: iupakStreamController.addError,
-        onDone: iupakStreamController.close,
-      );
-    }();
+      },
+    );
+    _smilesStream = asyncRes.smiles;
+    _inchiStream = asyncRes.inchi;
+    _iupacStream = asyncRes.iupac;
   }
 
   @override
@@ -230,8 +152,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 stream: _inchiStream,
               ),
               Slot(
-                label: "IUPAK",
-                stream: _iupakStream,
+                label: "IUPAC",
+                stream: _iupacStream,
               ),
             ],
           ),
