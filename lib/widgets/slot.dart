@@ -40,14 +40,18 @@ class Slot extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
+                width: 60,
+                height: 25,
                 margin: const EdgeInsets.all(8),
                 color: Colors.grey.shade400,
                 padding: const EdgeInsets.all(3),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    color: Theme.of(context).cardColor,
+                child: Center(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: Theme.of(context).cardColor,
+                    ),
                   ),
                 ),
               ),

@@ -212,8 +212,8 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     required void Function() onPressed,
   }) {
     return SizedBox(
-      width: 50,
-      height: 50,
+      width: 45,
+      height: 45,
       child: ElevatedButton(
         onPressed: onPressed,
         style: ButtonStyle(
@@ -224,7 +224,13 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             const Color.fromARGB(255, 23, 23, 23),
           ),
         ),
-        child: child,
+        child: OverflowBox(
+          minWidth: 60,
+          minHeight: 60,
+          maxHeight: 70,
+          maxWidth: 70,
+          child: child,
+        ),
       ),
     );
   }
