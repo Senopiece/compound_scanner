@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import 'jumping_dots.dart';
 
-// TODO: blinking when camera permission is not granted (mb ImagePick problem)
 class FullscreenCamera extends StatefulWidget {
   final void Function(Size, double, int, CameraImage) onCameraImageCallback;
   final bool flash;
